@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 
-<head th:replace="~{fragments :: head(title='Scroom')}"></head>
+<head th:replace="~{fragments :: head(title='Go Do It')}"></head>
 
 <body>
 
@@ -12,7 +12,7 @@
     <div class="header">
         <div class="header-left">
             <button class="hamburger-btn" onclick="toggleSidebar()">&#9776;</button>
-            <h1>Scroom</h1>
+            <h1>Go Do It</h1>
         </div>
         <button class="add-btn" hx-get="/stories/form" hx-target="#modal-content"
             hx-on::after-request="document.getElementById('create-modal').showModal()">+</button>
