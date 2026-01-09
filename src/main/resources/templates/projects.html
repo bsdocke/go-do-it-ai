@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head th:replace="~{fragments :: head(title='Scroom - Projects')}"></head>
+
+<body>
+
+    <div class="overlay" onclick="toggleSidebar()"></div>
+
+    <nav th:replace="~{fragments :: sidebar(activePage='projects')}"></nav>
+
+    <div class="header">
+        <div class="header-left">
+            <button class="hamburger-btn" onclick="toggleSidebar()">&#9776;</button>
+            <h1>Projects</h1>
+        </div>
+        <button class="add-btn" hx-get="/projects/form" hx-target="#modal-content"
+            hx-on::after-request="document.getElementById('create-modal').showModal()">+</button>
+    </div>
+
+    <div class="container" style="padding: 20px; max-width: 800px; margin: 0 auto;">
+        <div id="project-list" class="sprint-list">
+            <th:block th:each="project : ${projects}">
+                <div th:replace="~{fragments :: projectRow(project=${project})}"></div>
+            </th:block>
+
+            <div th:if="${#lists.isEmpty(projects)}" class="empty-state">
+                <p>No projects found.</p>
+            </div>
+        </div>
+    </div>
+
+    <dialog id="create-modal">
+        <div id="modal-content">
+            <!-- Form will be injected here via HTMX -->
+        </div>
+    </dialog>
+</body>
+
+</html>

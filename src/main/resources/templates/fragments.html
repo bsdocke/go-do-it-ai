@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<body>
+
+    <!-- Shared Head Fragment -->
+
+    <head th:fragment="head(title)">
+        <title th:text="${title}">Scroom</title>
+        <link rel="stylesheet" th:href="@{/css/styles.css}" />
+        <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+        <script th:src="@{/js/main.js}"></script>
+    </head>
+
+    <!-- Shared Sidebar Fragment -->
+    <nav th:fragment="sidebar(activePage)" class="sidebar" id="sidebar">
+        <button class="close-btn" onclick="toggleSidebar()">&times;</button>
+        <ul>
+            <li><a href="/" th:classappend="${activePage == 'board' ? 'active' : ''}">Current Sprint</a></li>
+            <li><a href="/backlog" th:classappend="${activePage == 'backlog' ? 'active' : ''}">Backlog</a></li>
+            <li><a href="/sprints" th:classappend="${activePage == 'sprints' ? 'active' : ''}">Sprints</a></li>
+            <li><a href="/projects" th:classappend="${activePage == 'projects' ? 'active' : ''}">Projects</a></li>
+        </ul>
+    </nav>
+
+    <div th:fragment="card(story, oobTarget)" class="card" th:id="'card-' + ${story.id}" th:data-id="${story.id}"
+        hx-trigger="click" th:hx-get="@{/stories/form(id=${story.id}, view='board')}" hx-target="#modal-content"
+        hx-on::after-request="document.getElementById('create-modal').showModal()" th:hx-swap-oob="${oobTarget}">
+        <button type="button" class="delete-btn" th:hx-delete="@{/stories/{id}(id=${story.id})}" hx-trigger="confirmed"
+            hx-target="closest .card" hx-swap="outerHTML" onclick="event.preventDefault(); event.stopPropagation(); Swal.fire({
+                title: 'Are you sure?',
+                text: 'You won\'t be able to revert this!',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Yes, delete it!',
+                heightAuto: false
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    htmx.trigger(this, 'confirmed');
+                }
+            })">×</button>
+        <span class="card-title" th:text="${story.title}">Story Title</span>
+        <span class="card-desc" th:text="${#strings.abbreviate(story.description, 120)}">Description...</span>
+        <span class="card-assignee" th:text="${story.assignee != null ? story.assignee : 'Unassigned'}">Assignee</span>
+    </div>
+
+    <div th:fragment="backlogItem(story, oobTarget)" class="backlog-item" th:id="'card-' + ${story.id}"
+        hx-trigger="click" th:hx-get="@{/stories/form(id=${story.id}, view='backlog')}" hx-target="#modal-content"
+        hx-on::after-request="document.getElementById('create-modal').showModal()" th:hx-swap-oob="${oobTarget}">
+
+        <div class="backlog-item-details">
+            <span class="backlog-title" th:text="${story.title}">Story Title</span>
+            <span class="backlog-desc" th:text="${#strings.abbreviate(story.description, 100)}">Description...</span>
+        </div>
+        <div class="backlog-meta">
+            <span class="backlog-status" th:text="${story.status.name}">Status</span>
+            <span class="backlog-assignee"
+                th:text="${story.assignee != null ? story.assignee : 'Unassigned'}">Assignee</span>
+        </div>
+    </div>
+
+    <!-- OOB Wrappers to prevent content stripping -->
+    <th:block th:fragment="cardOob(story, oobTarget)">
+        <div th:hx-swap-oob="${oobTarget}">
+            <div th:replace="~{::card(story=${story}, oobTarget=null)}"></div>
+        </div>
+    </th:block>
+
+    <th:block th:fragment="backlogItemOob(story, oobTarget)">
+        <div th:hx-swap-oob="${oobTarget}">
+            <div th:replace="~{::backlogItem(story=${story}, oobTarget=null)}"></div>
+        </div>
+    </th:block>
+
+    <div th:fragment="storyForm(story)">
+        <form method="dialog" style="position: relative;">
+            <input type="hidden" name="view" th:value="${view != null ? view : 'board'}" />
+            <button type="button" class="delete-btn" style="opacity: 1; top: 0; right: 0; font-size: 1.5em;"
+                th:if="${story.id != null}" th:hx-delete="@{/stories/{id}(id=${story.id})}" hx-trigger="confirmed"
+                hx-target="this" hx-swap="none"
+                th:hx-on::after-request="|if(event.detail.successful) { document.getElementById('create-modal').close(); var c = document.getElementById('card-${story.id}'); if(c) c.remove(); }|"
+                onclick="event.preventDefault(); Swal.fire({
+                    title: 'Are you sure?',
+                    text: 'You won\'t be able to revert this!',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#3085d6',
+                    cancelButtonColor: '#d33',
+                    confirmButtonText: 'Yes, delete it!',
+                    heightAuto: false,
+                    target: document.getElementById('create-modal')
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        htmx.trigger(this, 'confirmed');
+                    }
+                })">×</button>
+            <h2 style="margin-top:0" th:text="${story.id == null ? 'Create User Story' : 'Edit User Story'}">Create User
+                Story</h2>
+            <div class="form-group">
+                <label for="title">Title</label>
+                <input type="text" id="title" name="title" required autocomplete="off" th:value="${story.title}">
+            </div>
+            <div class="form-group">
+                <label for="description">Description</label>
+                <textarea id="description" name="description" required th:text="${story.description}"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="assignee">Assignee</label>
+                <input type="text" id="assignee" name="assignee" required autocomplete="off"
+                    th:value="${story.assignee}">
+            </div>
+            <div class="form-group">
+                <label for="sprintId">Sprint (Optional)</label>
+                <select id="sprintId" name="sprintId">
+                    <option value="">-- No Sprint --</option>
+                    <option th:each="sprint : ${activeSprints}" th:value="${sprint.id}" th:text="${sprint.name}"
+                        th:selected="${story.sprint != null && story.sprint.id == sprint.id}"></option>
+                </select>
+            </div>
+            <div class="btn-group">
+                <button type="button" class="secondary"
+                    onclick="document.getElementById('create-modal').close()">Cancel</button>
+                <button type="submit" class="primary" th:hx-post="${story.id == null ? '/stories' : ''}"
+                    th:hx-put="${story.id != null ? '/stories/' + story.id : ''}"
+                    th:hx-target="${story.id == null ? 'this' : '#card-' + story.id}"
+                    th:hx-swap="${story.id == null ? 'none' : 'outerHTML'}"
+                    hx-on::after-request="if(event.detail.successful) { document.getElementById('create-modal').close(); }">Save</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Sprint Fragments -->
+    <div th:fragment="sprintList(sprints)" id="sprint-list" class="sprint-list">
+        <th:block th:each="sprint : ${sprints}">
+            <div th:replace="~{fragments :: sprintRow(sprint=${sprint})}"></div>
+        </th:block>
+
+        <div th:if="${#lists.isEmpty(sprints)}" class="empty-state">
+            <p>No sprints found.</p>
+        </div>
+    </div>
+
+    <div th:fragment="sprintRow(sprint)" class="sprint-row" th:id="'sprint-' + ${sprint.id}"
+        th:title="${sprint.description}" hx-trigger="click" th:hx-get="@{/sprints/form(id=${sprint.id})}"
+        hx-target="#modal-content" hx-on::after-request="document.getElementById('create-modal').showModal()">
+
+        <div class="sprint-info">
+            <span class="sprint-name" th:text="${sprint.name}">Sprint Name</span>
+            <span class="sprint-dates"
+                th:text="'Start: ' + ${#temporals.format(sprint.startDate, 'MM/dd/yyyy')} + ' - End: ' + ${#temporals.format(sprint.endDate, 'MM/dd/yyyy')}">Dates</span>
+        </div>
+
+        <button type="button" class="delete-btn" th:hx-delete="@{/sprints/{id}(id=${sprint.id})}" hx-trigger="confirmed"
+            hx-target="#sprint-list" hx-swap="outerHTML" onclick="event.preventDefault(); event.stopPropagation(); Swal.fire({
+                    title: 'Delete Sprint?',
+                    text: 'Stories will be moved to Backlog.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#3085d6',
+                    cancelButtonColor: '#d33',
+                    confirmButtonText: 'Yes, delete it!',
+                    heightAuto: false
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        htmx.trigger(this, 'confirmed');
+                    }
+                })">×</button>
+    </div>
+
+    <div th:fragment="sprintForm(sprint)">
+        <form method="dialog" style="position: relative;">
+            <button type="button" class="delete-btn" style="opacity: 1; top: 0; right: 0; font-size: 1.5em;"
+                th:if="${sprint.id != null}" th:hx-delete="@{/sprints/{id}(id=${sprint.id})}" hx-trigger="confirmed"
+                hx-target="this" hx-swap="none"
+                th:hx-on::after-request="|if(event.detail.successful) { document.getElementById('create-modal').close(); var c = document.getElementById('sprint-${sprint.id}'); if(c) c.remove(); }|"
+                onclick="event.preventDefault(); Swal.fire({
+                    title: 'Delete Sprint?',
+                    text: 'Stories will be moved to Backlog.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#3085d6',
+                    cancelButtonColor: '#d33',
+                    confirmButtonText: 'Yes, delete it!',
+                    heightAuto: false,
+                    target: document.getElementById('create-modal')
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        htmx.trigger(this, 'confirmed');
+                    }
+                })">×</button>
+
+            <h2 style="margin-top:0" th:text="${sprint.id == null ? 'Create Sprint' : 'Edit Sprint'}">Create Sprint</h2>
+
+            <div class="form-group">
+                <label for="name">Name</label>
+                <input type="text" id="name" name="name" required autocomplete="off" th:value="${sprint.name}">
+            </div>
+
+            <div class="form-group">
+                <label for="description">Description (Optional)</label>
+                <textarea id="description" name="description" style="height: 60px;"
+                    th:text="${sprint.description}"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="startDate">Start Date</label>
+                <input type="date" id="startDate" name="startDate" required th:value="${sprint.startDate}">
+            </div>
+
+            <div class="form-group">
+                <label for="endDate">End Date</label>
+                <input type="date" id="endDate" name="endDate" required th:value="${sprint.endDate}">
+            </div>
+
+            <div class="btn-group">
+                <button type="button" class="secondary"
+                    onclick="document.getElementById('create-modal').close()">Cancel</button>
+                <button type="submit" class="primary" th:hx-post="${sprint.id == null ? '/sprints' : ''}"
+                    th:hx-put="${sprint.id != null ? '/sprints/' + sprint.id : ''}"
+                    th:hx-target="${sprint.id == null ? '#sprint-list' : '#sprint-' + sprint.id}"
+                    th:hx-swap="${sprint.id == null ? 'afterbegin' : 'outerHTML'}"
+                    hx-on::after-request="if(event.detail.successful) { document.getElementById('create-modal').close(); var es = document.querySelector('.empty-state'); if(es) es.remove(); }">Save</button>
+            </div>
+        </form>
+    </div>
+
+    </div>
+
+    <!-- Project Components -->
+    <div th:fragment="projectRow(project)" class="sprint-row" th:id="'project-' + ${project.id}">
+        <div class="sprint-info">
+            <h3 th:text="${project.name}" style="margin: 0 0 5px 0; color: #fff;">Project Name</h3>
+            <div style="font-size: 0.9em; color: #aaa;">
+                <span th:text="${project.description}">Description</span>
+            </div>
+        </div>
+        <div class="sprint-actions">
+            <!-- Edit Button: Opens Modal -->
+            <button class="icon-btn edit-btn" th:hx-get="@{/projects/form(id=${project.id})}" hx-target="#modal-content"
+                hx-on::after-request="document.getElementById('create-modal').showModal()" title="Edit Project">
+                ✎
+            </button>
+            <button class="icon-btn delete-btn" th:hx-delete="@{/projects/{id}(id=${project.id})}"
+                th:hx-target="'#project-' + ${project.id}" hx-swap="outerHTML" hx-trigger="confirmed" onclick="Swal.fire({
+                    title: 'Delete Project?',
+                    text: 'This will delete ALL Sprints and Stories in this project!',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#3085d6',
+                    confirmButtonText: 'Yes, delete everything!',
+                    heightAuto: false,
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        htmx.trigger(this, 'confirmed');
+                    }
+                })" title="Delete Project">
+                ×
+            </button>
+        </div>
+    </div>
+
+    <div th:fragment="projectForm(project)">
+        <form id="project-form">
+            <button type="button" class="close-modal-btn"
+                onclick="document.getElementById('create-modal').close()">×</button>
+
+            <h2 style="margin-top:0" th:text="${project.id == null ? 'Create Project' : 'Edit Project'}">Create Project
+            </h2>
+
+            <div class="form-group">
+                <label for="name">Name</label>
+                <input type="text" id="name" name="name" required autocomplete="off" th:value="${project.name}">
+            </div>
+
+            <div class="form-group">
+                <label for="description">Description (Optional)</label>
+                <textarea id="description" name="description" style="height: 60px;"
+                    th:text="${project.description}"></textarea>
+            </div>
+
+            <div class="btn-group">
+                <button type="button" class="secondary"
+                    onclick="document.getElementById('create-modal').close()">Cancel</button>
+                <button type="submit" class="primary" th:hx-post="${project.id == null ? '/projects' : ''}"
+                    th:hx-put="${project.id != null ? '/projects/' + project.id : ''}"
+                    th:hx-target="${project.id == null ? '#project-list' : '#project-' + project.id}"
+                    th:hx-swap="${project.id == null ? 'afterbegin' : 'outerHTML'}"
+                    hx-on::after-request="if(event.detail.successful) { document.getElementById('create-modal').close(); }">Save</button>
+            </div>
+        </form>
+    </div>
+
+    <div th:fragment="emptyState">
+        <div class="empty-state">
+            <p>No sprints found.</p>
+        </div>
+    </div>
+
+    <!-- Empty fragment for deletion -->
+    <th:block th:fragment="nothing"></th:block>
+
+</body>
+
+</html>

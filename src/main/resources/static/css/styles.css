@@ -1,0 +1,457 @@
+:root {
+    --bg-color: #1e1e1e;
+    --text-color: #e0e0e0;
+    --column-bg: #2d2d2d;
+    --card-bg: #3c3c3c;
+    --card-hover: #4a4a4a;
+    --accent-color: #007bff;
+    --border-color: #444;
+    --modal-bg: #2d2d2d;
+    --input-bg: #3c3c3c;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 20px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    /* Prevent window scroll */
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    position: relative;
+}
+
+h1 {
+    margin: 0;
+}
+
+.add-btn {
+    background-color: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    font-size: 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 15px;
+    transition: transform 0.2s;
+}
+
+.add-btn:hover {
+    transform: scale(1.1);
+}
+
+.board {
+    display: flex;
+    gap: 15px;
+    overflow-x: auto;
+    /* height: 100%;  Removed for stacked view */
+    min-height: 300px;
+    /* Minimum height for usability */
+    padding-bottom: 20px;
+    width: 100%;
+    align-items: flex-start;
+    /* Align columns to top */
+}
+
+.main-content {
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: 20px;
+    width: 100%;
+}
+
+.column {
+    background-color: var(--column-bg);
+    border-radius: 8px;
+    min-width: 280px;
+    width: 280px;
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    max-height: 100%;
+    /* Ensure column doesn't exceed board height */
+}
+
+.column-header {
+    font-weight: bold;
+    font-size: 1.1em;
+    margin-bottom: 10px;
+    text-align: center;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.story-list {
+    flex-grow: 1;
+    overflow-y: auto;
+    min-height: 100px;
+    /* target for drop */
+}
+
+.card {
+    background-color: var(--card-bg);
+    border-radius: 5px;
+    padding: 10px;
+    margin-bottom: 10px;
+    cursor: grab;
+    transition: background-color 0.2s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    position: relative;
+    /* For absolute positioning of delete button */
+}
+
+.delete-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: none;
+    border: none;
+    color: #888;
+    cursor: pointer;
+    font-size: 1.2em;
+    padding: 0;
+    line-height: 1;
+    z-index: 10;
+    opacity: 0;
+    /* Hidden by default */
+    transition: opacity 0.2s, color 0.2s;
+}
+
+.card:hover .delete-btn {
+    opacity: 1;
+    /* Show on hover */
+}
+
+.delete-btn:hover {
+    color: #ff4444;
+}
+
+.card:hover {
+    background-color: var(--card-hover);
+}
+
+.card-title {
+    font-weight: bold;
+    font-size: 1.05em;
+    margin-bottom: 5px;
+    display: block;
+}
+
+.card-desc {
+    font-size: 0.9em;
+    color: #aaa;
+    margin-bottom: 8px;
+    display: block;
+    word-wrap: break-word;
+}
+
+.card-assignee {
+    font-size: 0.8em;
+    color: var(--accent-color);
+    text-align: right;
+    display: block;
+    margin-top: 5px;
+}
+
+/* Modal Styles */
+dialog {
+    background-color: var(--modal-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    width: 400px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+dialog::backdrop {
+    background-color: rgba(0, 0, 0, 0.7);
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+input,
+textarea {
+    width: 100%;
+    padding: 8px;
+    background-color: var(--input-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+textarea {
+    resize: vertical;
+    height: 100px;
+}
+
+.btn-group {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+button.primary {
+    background-color: var(--accent-color);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+button.secondary {
+    background-color: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+button:hover {
+    opacity: 0.9;
+}
+
+/* Sidebar */
+.sidebar {
+    height: 100%;
+    width: 250px;
+    position: fixed;
+    z-index: 1000;
+    top: 0;
+    left: -250px;
+    background-color: #1e1e1e;
+    overflow-x: hidden;
+    transition: 0.3s;
+    padding-top: 60px;
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.5);
+}
+
+.sidebar.open {
+    left: 0;
+}
+
+.sidebar ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+.sidebar li a {
+    padding: 15px 25px;
+    text-decoration: none;
+    font-size: 1.1em;
+    color: #aeaeae;
+    display: block;
+    transition: 0.3s;
+}
+
+.sidebar li a:hover,
+.sidebar li a.active {
+    color: #f1f1f1;
+    background-color: #333;
+}
+
+.sidebar .close-btn {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    font-size: 36px;
+    background: none;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+}
+
+/* Overlay */
+.overlay {
+    height: 100%;
+    width: 100%;
+    position: fixed;
+    z-index: 900;
+    top: 0;
+    left: 0;
+    background-color: rgba(0, 0, 0, 0.7);
+    opacity: 0;
+    visibility: hidden;
+    transition: 0.3s;
+}
+
+.overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Header & Hamburger */
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    position: relative;
+    /* Context for absolute positioning */
+    min-height: 40px;
+}
+
+/* .header-left removed as it was empty */
+
+.hamburger-btn {
+    font-size: 24px;
+    cursor: pointer;
+    background: none;
+    border: none;
+    color: white;
+    padding: 5px 10px;
+
+    /* Absolute positioning */
+    position: absolute;
+    left: -10px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 1100;
+    /* Above sidebar (1000) */
+    transition: left 0.3s ease;
+}
+
+.hamburger-btn.open {
+    left: 260px;
+    /* Sidebar width (250) + padding */
+}
+
+/* Backlog Styles */
+.backlog-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 20px;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.backlog-item {
+    background-color: var(--card-bg);
+    border-radius: 5px;
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.backlog-item:hover {
+    transform: translateY(-2px);
+    background-color: #3d3d3d;
+}
+
+.backlog-item-details {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.backlog-title {
+    font-weight: bold;
+    font-size: 1.1em;
+}
+
+.backlog-desc {
+    color: #aaa;
+    font-size: 0.9em;
+}
+
+.backlog-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 5px;
+    font-size: 0.9em;
+    color: #888;
+}
+
+.empty-state {
+    text-align: center;
+    color: #888;
+    margin-top: 50px;
+}
+
+/* Sprint Styles */
+.sprint-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    /* Spacing between rows */
+}
+
+.sprint-row {
+    background-color: var(--card-bg);
+    border-radius: 8px;
+    /* Rounded corners */
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    position: relative;
+    transition: transform 0.2s, background-color 0.2s;
+    border: 1px solid transparent;
+}
+
+.sprint-row:hover {
+    background-color: #3d3d3d;
+    transform: translateY(-2px);
+    border-color: var(--border-color);
+}
+
+.sprint-info {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.sprint-name {
+    font-weight: bold;
+    font-size: 1.2em;
+    color: var(--text-color);
+}
+
+.sprint-dates {
+    font-size: 0.9em;
+    color: #aaa;
+}
+
+.sprint-row .delete-btn {
+    top: 10px;
+    right: 10px;
+    transform: none;
+}

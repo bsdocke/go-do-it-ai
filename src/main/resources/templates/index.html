@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head th:replace="~{fragments :: head(title='Scroom')}"></head>
+
+<body>
+
+    <div class="overlay" onclick="toggleSidebar()"></div>
+
+    <nav th:replace="~{fragments :: sidebar(activePage='board')}"></nav>
+
+    <div class="header">
+        <div class="header-left">
+            <button class="hamburger-btn" onclick="toggleSidebar()">&#9776;</button>
+            <h1>Scroom</h1>
+        </div>
+        <button class="add-btn" hx-get="/stories/form" hx-target="#modal-content"
+            hx-on::after-request="document.getElementById('create-modal').showModal()">+</button>
+    </div>
+
+    <div class="main-content">
+        <th:block th:if="${#lists.isEmpty(boardData)}">
+            <div class="sprint-banner"
+                style="text-align: center; margin-bottom: 10px; padding: 10px; background-color: #2d2d2d; border-radius: 5px;">
+                <span style="color: #888; font-style: italic;">No Active Sprint</span>
+            </div>
+        </th:block>
+
+        <th:block th:each="data : ${boardData}">
+            <div class="sprint-section" style="margin-bottom: 40px;">
+                <div class="sprint-banner"
+                    th:title="${data.sprint.description != null && !#strings.isEmpty(data.sprint.description) ? data.sprint.description : data.sprint.name}"
+                    style="text-align: center; margin-bottom: 10px; padding: 10px; background-color: #2d2d2d; border-radius: 5px; cursor: help;">
+                    <span style="font-weight: bold; margin-right: 20px;" th:text="${data.sprint.name}">Sprint
+                        Name</span>
+                    <span
+                        th:text="'Start Date: ' + ${#temporals.format(data.sprint.startDate, 'MM/dd/yyyy')} + ' - End Date: ' + ${#temporals.format(data.sprint.endDate, 'MM/dd/yyyy')}">Dates</span>
+                </div>
+
+                <div class="board">
+                    <div class="column" th:each="status : ${statuses}">
+                        <div class="column-header" th:text="${status.name}">Status</div>
+                        <div class="story-list" th:id="'story-list-' + ${data.sprint.id} + '-' + ${status.id}"
+                            th:data-status-id="${status.id}" th:data-sprint-id="${data.sprint.id}">
+                            <th:block th:with="sprintStories=${data.storiesByStatus.get(status.name)}">
+                                <th:block th:if="${sprintStories != null}">
+                                    <th:block th:each="story : ${sprintStories}">
+                                        <div th:replace="~{fragments :: card(story=${story}, oobTarget=null)}"></div>
+                                    </th:block>
+                                </th:block>
+                            </th:block>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </th:block>
+    </div>
+
+    <dialog id="create-modal">
+        <div id="modal-content">
+            <!-- Form will be injected here via HTMX -->
+        </div>
+    </dialog>
+
+    <script>
+        htmx.onLoad(function (content) {
+            var sortables = document.querySelectorAll(".story-list");
+            for (var i = 0; i < sortables.length; i++) {
+                var sprintId = sortables[i].getAttribute('data-sprint-id');
+                new Sortable(sortables[i], {
+                    group: 'sprint-' + sprintId, // Scope dragging to this sprint
+                    animation: 150,
+                    filter: '.delete-btn', // Ignore delete button
+                    preventOnFilter: false, // Allow clicks on filtered elements
+                    onEnd: function (evt) {
+                        var itemEl = evt.item;
+                        var newStatusId = evt.to.getAttribute('data-status-id');
+                        var storyId = itemEl.getAttribute('data-id');
+
+                        // Trigger HTMX request to update backend
+                        if (newStatusId && storyId) {
+                            htmx.ajax('PUT', '/stories/' + storyId + '/move', {
+                                values: { statusId: newStatusId },
+                                swap: 'none'
+                            });
+                        }
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+
+</html>
