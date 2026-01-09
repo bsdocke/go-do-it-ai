@@ -22,6 +22,9 @@ public class Project {
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<UserStory> stories = new ArrayList<>();
 
+    @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Status> statuses = new ArrayList<>();
+
     public Project() {
     }
 
@@ -68,5 +71,13 @@ public class Project {
 
     public void setStories(List<UserStory> stories) {
         this.stories = stories;
+    }
+
+    public List<Status> getStatuses() {
+        return statuses;
+    }
+
+    public void setStatuses(List<Status> statuses) {
+        this.statuses = statuses;
     }
 }

@@ -15,7 +15,7 @@ The initial commit represents a minimum viable product that was reached using Ge
 That said, it isn't rocket science to whip something like this up yourself, it's just tedious. What will be really interesting is seeing how well AntiGravity does with the more complex features. Next steps are, in no particular order
 
 * Add a "Projects" feature that actually scopes the tasks to a project. Currently you can create projects, but only the first one actually has Sprints or Tasks associated with it.
-* Make Statuses truly customizable. While they are driven from the database they are currently not changeable, and certainly not scoped to a project.
+* ~~Make Statuses truly customizable. While they are driven from the database they are currently not changeable, and certainly not scoped to a project.~~ Done, it had a way easier time of it than I expected.
 * Provide the ability to change which project you are viewing. Again, everything is sort of global scope at the moment.
 * Security - There isn't any at the moment. I want to see it provide OAuth with a common provider like Google to start with, then maybe we can look at maintaining separate credentials with either email verification or 2FA (probably the former, don't really want to spend money on this)
 * Making this easily deployable - Again, not trying to host the next Jira here. I just want to see how far this goes and, if it shakes out, provide an open source, free tool people can easily use.

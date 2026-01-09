@@ -24,15 +24,24 @@ public class BoardController {
 
     @GetMapping("/")
     public String index(Model model) {
-        List<Status> statuses = boardService.getAllStatuses();
+        // List<Status> statuses = boardService.getAllStatuses(); // Unused
         List<Sprint> activeSprints = boardService.getActiveSprintsForBoard(java.time.LocalDate.now());
 
-        List<Map<String, Object>> boardData = new ArrayList<>();
+        // Statuses are now project specific, but for board view, we need to know WHICH
+        // project context we are in.
+        // It seems the view iterates over "boardData", which contains Sprints.
+        // Sprints belong to a Project. So each "Sprint Section" should know its
+        // statuses.
+        // The original code passed "statuses" globally. We should probably remove that
+        // global list
+        // OR if the board is only for "Active" sprints, and maybe we assume single
+        // project for now or refactor.
+        // Given requirements: "Current Sprint should source only statuses belonging to
+        // the project that the Sprint is linked to"
 
-        if (activeSprints.isEmpty()) {
-            // Optional: Put dummy data or handle in view?
-            // View handles empty boardData by showing "No Active Sprint"
-        } else {
+        // We will enrich boardData to include statuses for that sprint's project.
+        List<Map<String, Object>> enrichedBoardData = new ArrayList<>();
+        if (!activeSprints.isEmpty()) {
             for (Sprint sprint : activeSprints) {
                 List<UserStory> stories = boardService.getStoriesForSprint(sprint.getId());
                 Map<String, List<UserStory>> storiesByStatus = stories.stream()
@@ -41,12 +50,15 @@ public class BoardController {
                 Map<String, Object> sprintData = new java.util.HashMap<>();
                 sprintData.put("sprint", sprint);
                 sprintData.put("storiesByStatus", storiesByStatus);
-                boardData.add(sprintData);
+                // Add project statuses here
+                sprintData.put("statuses", boardService.getStatusesForProject(sprint.getProject()));
+
+                enrichedBoardData.add(sprintData);
             }
         }
 
-        model.addAttribute("statuses", statuses);
-        model.addAttribute("boardData", boardData);
+        // model.addAttribute("statuses", statuses); // REMOVED global statuses
+        model.addAttribute("boardData", enrichedBoardData);
         return "index";
     }
 
@@ -255,6 +267,116 @@ public class BoardController {
     @ResponseBody
     public String deleteProject(@PathVariable Long id) {
         boardService.deleteProject(id);
+        return "";
+    }
+
+    // --- Status Management ---
+
+    @GetMapping("/statuses")
+    public String statuses(Model model) {
+        // For simplicity, we might show statuses for the "Default Project" or all
+        // projects?
+        // Let's assume we list projects and their statuses?
+        // Or per the Prompt: "create a "Statuses" page... similar to Current Sprint
+        // page"
+        // "Tiles with the name of the Status will appear beneath the header... similar
+        // to columns"
+        // This implies we select a project context? Or maybe just use DefaultProject
+        // for now
+        // since the user didn't specify multi-project Navigation for this page.
+        // However, "Statuses in the DB must relate to a project".
+        // Let's pass all projects to the view, and maybe iterate them?
+        // Or Just show the first project's statuses for MVP as user context is
+        // ambiguous?
+        // Better: Show all projects and their statuses?
+        // Let's grab all projects.
+        model.addAttribute("projects", boardService.getAllProjects());
+        // And helper to get statuses per project?
+        // actually accessing service from view is bad.
+        // Let's pre-load a map?
+        Map<Long, List<Status>> projectStatuses = boardService.getAllProjects().stream()
+                .collect(Collectors.toMap(com.antigravity.jira.model.Project::getId,
+                        p -> boardService.getStatusesForProject(p)));
+        model.addAttribute("projectStatuses", projectStatuses);
+
+        return "statuses";
+    }
+
+    @GetMapping("/statuses/form")
+    public String getStatusForm(@RequestParam(required = false) Long id,
+            @RequestParam(required = false) Long projectId,
+            Model model) {
+        Status status = new Status();
+        if (id != null) {
+            status = boardService.getStatus(id);
+        } else if (projectId != null) {
+            status.setProject(boardService.getProject(projectId));
+        } else {
+            // Default to first project if available, or just null (user must select)
+            List<com.antigravity.jira.model.Project> projects = boardService.getAllProjects();
+            if (!projects.isEmpty()) {
+                status.setProject(projects.get(0));
+            }
+        }
+
+        model.addAttribute("status", status);
+        model.addAttribute("projects", boardService.getAllProjects());
+        return "fragments :: statusForm(status=${status}, projects=${projects})";
+    }
+
+    @PostMapping("/statuses")
+    public Object createStatus(@RequestParam String name,
+            @RequestParam Long projectId, Model model) {
+        try {
+            com.antigravity.jira.model.Project project = boardService.getProject(projectId);
+            Status status = boardService.createStatus(name, project);
+            // Return column/tile with OOB swap to place it in correct list
+            model.addAttribute("status", status);
+            return "fragments :: statusRowOob(status=${status})";
+        } catch (IllegalArgumentException e) {
+            return org.springframework.http.ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    // Helper to allow returning View name for success is messy with mixed return
+    // types.
+    // Better approach: Use ExceptionHandler or just return ResponseEntity for both.
+    // But rendering the template to string manually requires template engine
+    // injection.
+    // Let's try a different strategy:
+    // If we change return type to Object.
+
+    // REVISIT: Simplest path - Catch exception, if error return
+    // ResponseEntity.badRequest logic.
+    // If success, return String (view name). Spring handles Object return types
+    // fine.
+
+    @PutMapping("/statuses/{id}")
+    public Object updateStatus(@PathVariable Long id, @RequestParam String name, Model model) {
+        try {
+            Status status = boardService.updateStatus(id, name);
+            model.addAttribute("status", status);
+            return "fragments :: statusRow(status=${status})";
+        } catch (IllegalArgumentException e) {
+            return org.springframework.http.ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/statuses/{id}")
+    @ResponseBody
+    public org.springframework.http.ResponseEntity<String> deleteStatus(@PathVariable Long id) {
+        try {
+            boardService.deleteStatus(id);
+            return org.springframework.http.ResponseEntity.ok("");
+        } catch (IllegalStateException e) {
+            return org.springframework.http.ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/statuses/reorder")
+    @ResponseBody
+    public String reorderStatuses(@RequestParam("itemIds") List<Long> itemIds) {
+        boardService.updateStatusOrdering(itemIds);
         return "";
     }
 }

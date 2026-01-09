@@ -38,7 +38,7 @@
                 </div>
 
                 <div class="board">
-                    <div class="column" th:each="status : ${statuses}">
+                    <div class="column" th:each="status : ${data.statuses}">
                         <div class="column-header" th:text="${status.name}">Status</div>
                         <div class="story-list" th:id="'story-list-' + ${data.sprint.id} + '-' + ${status.id}"
                             th:data-status-id="${status.id}" th:data-sprint-id="${data.sprint.id}">

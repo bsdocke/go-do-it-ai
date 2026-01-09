@@ -52,6 +52,21 @@ public class BoardService {
                 }
             }
             userStoryRepository.saveAll(stories);
+
+            // Migrate global statuses to Initial Project (if any exist from old DB)
+            List<Status> globalStatuses = statusRepository.findByProjectIsNullOrderByPriorityAsc();
+            for (Status status : globalStatuses) {
+                status.setProject(initialProject);
+            }
+            statusRepository.saveAll(globalStatuses);
+
+            // If no statuses exist for init project (e.g. fresh DB), populate defaults
+            if (getStatusesForProject(initialProject).isEmpty()) {
+                String[] defaults = { "Analysis", "Ready", "In Progress", "Review", "Testing", "Staged", "Complete" };
+                for (String name : defaults) {
+                    createStatus(name, initialProject);
+                }
+            }
         }
     }
 
@@ -96,6 +111,87 @@ public class BoardService {
         return statusRepository.findAllByOrderByPriorityAsc();
     }
 
+    public List<Status> getStatusesForProject(com.antigravity.jira.model.Project project) {
+        // We'll need to add a repository method for this or filter
+        // Ideally: return statusRepository.findByProjectOrderByPriorityAsc(project);
+        // But for now, let's add the method to repository if not exists, or just filter
+        // Converting to stream filter for immediate compilation if repo method misses,
+        // but better to add repo method.
+        // Checking StatusRepository again... it doesn't have it yet.
+        // Let's rely on adding it to StatusRepo in a bit or use Example.
+        // For now, let's assume we added findAllByProjectOrderByPriorityAsc to Repo or
+        // use manual filter.
+        // Since I can't edit Repo in same atomic step easily without checking,
+        // I will implement a safe filter here or separate step.
+        // Actually, let's update Repository first or use this:
+        return statusRepository.findAll().stream()
+                .filter(s -> s.getProject() != null && project.getId().equals(s.getProject().getId()))
+                .sorted((s1, s2) -> s1.getPriority().compareTo(s2.getPriority()))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public Status createStatus(String name, com.antigravity.jira.model.Project project) {
+        Status existingName = statusRepository.findByNameAndProject(name, project);
+        if (existingName != null) {
+            throw new IllegalArgumentException("Status with name '" + name + "' already exists in this project.");
+        }
+
+        Status status = new Status();
+        status.setName(name);
+        status.setProject(project); // Can be null for global? No, req says project specific.
+
+        // Auto-priority: last
+        List<Status> existing = getStatusesForProject(project);
+        int maxPriority = existing.isEmpty() ? 0 : existing.get(existing.size() - 1).getPriority();
+        status.setPriority(maxPriority + 1);
+
+        return statusRepository.save(status);
+    }
+
+    @Transactional
+    public Status updateStatus(Long id, String name) {
+        Optional<Status> opt = statusRepository.findById(id);
+        if (opt.isPresent()) {
+            Status s = opt.get();
+            if (!s.getName().equals(name)) {
+                Status existingName = statusRepository.findByNameAndProject(name, s.getProject());
+                if (existingName != null) {
+                    throw new IllegalArgumentException(
+                            "Status with name '" + name + "' already exists in this project.");
+                }
+            }
+            s.setName(name);
+            return statusRepository.save(s);
+        }
+        return null;
+    }
+
+    @Transactional
+    public void deleteStatus(Long id) {
+        Status status = statusRepository.findById(id).orElse(null);
+        if (status != null) {
+            List<UserStory> stories = userStoryRepository.findByStatusOrderByIdDesc(status);
+            if (!stories.isEmpty()) {
+                throw new IllegalStateException(
+                        "Cannot delete status containing stories. Please move or delete the stories first.");
+            }
+            statusRepository.delete(status);
+        }
+    }
+
+    @Transactional
+    public void updateStatusOrdering(List<Long> orderedIds) {
+        for (int i = 0; i < orderedIds.size(); i++) {
+            Long id = orderedIds.get(i);
+            int priority = i + 1;
+            statusRepository.findById(id).ifPresent(s -> {
+                s.setPriority(priority); // 1-based priority
+                statusRepository.save(s);
+            });
+        }
+    }
+
     public List<UserStory> getAllStories() {
         return userStoryRepository.findAll();
     }
@@ -130,16 +226,22 @@ public class BoardService {
 
     @Transactional
     public UserStory createStory(String title, String description, String assignee, Long sprintId) {
-        Status analysisStatus = statusRepository.findByName("Analysis");
-        if (analysisStatus == null) {
-            throw new RuntimeException("Analysis status not found");
+        com.antigravity.jira.model.Project project = getDefaultProject();
+        List<Status> projectStatuses = getStatusesForProject(project);
+
+        if (projectStatuses.isEmpty()) {
+            throw new RuntimeException("No statuses defined for project: " + project.getName());
         }
+
+        Status defaultStatus = projectStatuses.get(0); // First one is lowest priority due to sorting in
+                                                       // getStatusesForProject
+
         UserStory story = new UserStory();
         story.setTitle(title);
         story.setDescription(description);
         story.setAssignee(assignee);
-        story.setStatus(analysisStatus);
-        story.setProject(getDefaultProject());
+        story.setStatus(defaultStatus);
+        story.setProject(project);
 
         if (sprintId != null) {
             sprintRepository.findById(sprintId).ifPresent(story::setSprint);
@@ -248,5 +350,9 @@ public class BoardService {
 
     public UserStory getStory(Long id) {
         return userStoryRepository.findById(id).orElse(null);
+    }
+
+    public Status getStatus(Long id) {
+        return statusRepository.findById(id).orElse(null);
     }
 }

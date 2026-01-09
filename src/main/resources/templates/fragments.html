@@ -22,6 +22,7 @@
             <li><a href="/backlog" th:classappend="${activePage == 'backlog' ? 'active' : ''}">Backlog</a></li>
             <li><a href="/sprints" th:classappend="${activePage == 'sprints' ? 'active' : ''}">Sprints</a></li>
             <li><a href="/projects" th:classappend="${activePage == 'projects' ? 'active' : ''}">Projects</a></li>
+            <li><a href="/statuses" th:classappend="${activePage == 'statuses' ? 'active' : ''}">Statuses</a></li>
         </ul>
     </nav>
 
@@ -317,6 +318,89 @@
         <div class="empty-state">
             <p>No sprints found.</p>
         </div>
+    </div>
+
+    <div th:fragment="statusRow(status)" class="column column-header-tile" th:id="'status-' + ${status.id}"
+        th:data-id="${status.id}"
+        style="min-width: 250px; background-color: #2d2d2d; border-radius: 8px; padding: 10px; cursor: grab; position: relative;">
+        <!-- Editable/Deletable via Modal on Click -->
+        <h3 th:text="${status.name}" style="margin: 0; text-align: center; color: #fff;"
+            th:hx-get="@{/statuses/form(id=${status.id})}" hx-target="#modal-content"
+            hx-on::after-request="document.getElementById('create-modal').showModal()">Status Name</h3>
+
+        <button class="delete-btn" style="top: 5px; right: 5px; opacity: 1;"
+            th:hx-delete="@{/statuses/{id}(id=${status.id})}" th:hx-target="'#status-' + ${status.id}"
+            hx-swap="outerHTML" hx-trigger="confirmed"
+            th:hx-on::after-request="|if(!event.detail.successful) { Swal.fire({ icon: 'error', title: 'Could not delete status', text: event.detail.xhr.responseText, confirmButtonColor: '#3085d6' }); }|"
+            onclick="event.stopPropagation(); Swal.fire({
+                title: 'Delete Status?',
+                text: 'Stories will be unassigned from this status.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Yes, delete it!',
+                heightAuto: false
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    htmx.trigger(this, 'confirmed');
+                }
+            })">×</button>
+    </div>
+
+    <div th:fragment="statusRowOob(status)" th:attr="hx-swap-oob='beforeend:#status-list-' + ${status.project.id}">
+        <div th:replace="~{fragments :: statusRow(status=${status})}"></div>
+    </div>
+
+    <div th:fragment="statusForm(status)">
+        <form method="dialog" style="position: relative;">
+            <button type="button" class="delete-btn" style="opacity: 1; top: 0; right: 0; font-size: 1.5em;"
+                th:if="${status.id != null}" th:hx-delete="@{/statuses/{id}(id=${status.id})}" hx-trigger="confirmed"
+                hx-target="this" hx-swap="none"
+                th:hx-on::after-request="|if(event.detail.successful) { document.getElementById('create-modal').close(); var c = document.getElementById('status-${status.id}'); if(c) c.remove(); } else { Swal.fire({ icon: 'error', title: 'Could not delete status', text: event.detail.xhr.responseText, confirmButtonColor: '#3085d6', target: document.getElementById('create-modal') }); }|"
+                onclick="event.preventDefault(); Swal.fire({
+                    title: 'Delete Status?',
+                    text: 'Stories will be unassigned from this status.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#d33',
+                    confirmButtonText: 'Yes, delete it!',
+                    heightAuto: false,
+                    target: document.getElementById('create-modal')
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        htmx.trigger(this, 'confirmed');
+                    }
+                })">×</button>
+
+            <h2 style="margin-top:0" th:text="${status.id == null ? 'Create Status' : 'Edit Status'}">Create Status</h2>
+            <div class="form-group">
+                <label for="name">Name</label>
+                <input type="text" id="name" name="name" required autocomplete="off" th:value="${status.name}">
+            </div>
+
+            <div class="form-group" th:if="${status.project == null || projects != null}">
+                <!-- Show dropdown if creating new status via generic button -->
+                <label for="projectId">Project</label>
+                <select id="projectId" name="projectId" class="project-select" required>
+                    <option th:each="p : ${projects}" th:value="${p.id}" th:text="${p.name}"
+                        th:selected="${status.project != null && p.id == status.project.id}"></option>
+                </select>
+            </div>
+            <input type="hidden" name="projectId" th:if="${status.project != null && projects == null}"
+                th:value="${status.project.id}" />
+
+            <div class="btn-group">
+                <button type="button" class="secondary"
+                    onclick="document.getElementById('create-modal').close()">Cancel</button>
+                <button type="submit" class="primary" th:hx-post="${status.id == null ? '/statuses' : ''}"
+                    th:hx-put="${status.id != null ? '/statuses/' + status.id : ''}"
+                    th:hx-target="${status.id == null ? 'body' : '#status-' + status.id}"
+                    th:hx-swap="${status.id == null ? 'none' : 'outerHTML'}"
+                    hx-on::after-request="if(event.detail.successful) { document.getElementById('create-modal').close(); } else { Swal.fire({ icon: 'error', title: 'Error', text: event.detail.xhr.responseText, confirmButtonColor: '#3085d6', target: document.getElementById('create-modal') }); }">Save</button>
+            </div>
+        </form>
     </div>
 
     <!-- Empty fragment for deletion -->

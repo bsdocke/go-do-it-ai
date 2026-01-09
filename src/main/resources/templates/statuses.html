@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head th:replace="~{fragments :: head(title='Go Do It - Statuses')}"></head>
+
+<body>
+
+    <div class="overlay" onclick="toggleSidebar()"></div>
+
+    <nav th:replace="~{fragments :: sidebar(activePage='statuses')}"></nav>
+
+    <div class="header">
+        <div class="header-left">
+            <button class="hamburger-btn" onclick="toggleSidebar()">&#9776;</button>
+            <h1>Statuses</h1>
+        </div>
+        <button class="add-btn" hx-get="/statuses/form" hx-target="#modal-content"
+            hx-on::after-request="document.getElementById('create-modal').showModal()">+</button>
+    </div>
+
+    <div class="container" style="padding: 20px; max-width: 100%; margin: 0;">
+
+        <th:block th:each="project : ${projects}">
+            <div class="project-status-section" style="margin-bottom: 40px;">
+
+                <h2 style="color: #fff; margin-bottom: 15px;" th:text="${project.name}">Project Name</h2>
+
+                <div class="board" style="align-items: flex-start; overflow-x: auto; padding-bottom: 10px;">
+                    <!-- Draggable Status List -->
+                    <div th:id="'status-list-' + ${project.id}" class="status-list" style="display: flex; gap: 15px;">
+                        <th:block th:each="status : ${projectStatuses.get(project.id)}">
+                            <div th:replace="~{fragments :: statusRow(status=${status})}"></div>
+                        </th:block>
+                    </div>
+                </div>
+
+            </div>
+        </th:block>
+
+        <div th:if="${#lists.isEmpty(projects)}" class="empty-state">
+            <p>No projects found. Create a project first.</p>
+        </div>
+    </div>
+
+    <dialog id="create-modal">
+        <div id="modal-content">
+            <!-- Form will be injected here via HTMX -->
+        </div>
+    </dialog>
+
+    <script>
+        htmx.onLoad(function (content) {
+            var sortables = document.querySelectorAll(".status-list");
+            for (var i = 0; i < sortables.length; i++) {
+                new Sortable(sortables[i], {
+                    animation: 150,
+                    ghostClass: 'blue-background-class',
+                    onEnd: function (evt) {
+                        var itemEl = evt.item;
+                        var listEl = evt.to;
+                        var itemIds = Array.from(listEl.children).map(child => child.getAttribute('data-id'));
+
+                        htmx.ajax('POST', '/statuses/reorder', {
+                            values: { itemIds: itemIds },
+                            swap: 'none'
+                        });
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+
+</html>
