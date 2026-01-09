@@ -7,4 +7,8 @@ import java.util.List;
 
 public interface UserStoryRepository extends JpaRepository<UserStory, Long> {
     List<UserStory> findByStatusOrderByIdDesc(Status status);
+
+    List<UserStory> findBySprintIsNullOrderByIdAsc();
+
+    List<UserStory> findBySprintIsNullAndProjectOrderByIdAsc(com.antigravity.jira.model.Project project);
 }

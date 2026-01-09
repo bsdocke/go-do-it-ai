@@ -14,7 +14,27 @@
         <script th:src="@{/js/main.js}"></script>
     </head>
 
-    <!-- Shared Sidebar Fragment -->
+    <!-- Shared Header Fragment -->
+    <div th:fragment="header(title, activePage, addButtonUrl)" class="header">
+        <button class="hamburger-btn" onclick="toggleSidebar()">&#9776;</button>
+
+        <div style="display: flex; align-items: center;">
+            <h1 th:text="${title}">Title</h1>
+            <button th:if="${addButtonUrl != null}" class="add-btn" th:hx-get="${addButtonUrl}"
+                hx-target="#modal-content" hx-on::after-request="document.getElementById('create-modal').showModal()"
+                th:disabled="${currentProject == null}"
+                th:title="${currentProject == null ? 'Project required' : 'Add New'}">+</button>
+        </div>
+
+        <div th:if="${activePage != 'projects'}" style="position: absolute; right: 0;">
+            <select name="projectId" hx-put="/context/project" hx-trigger="change" class="project-select-header"
+                style="padding: 5px; border-radius: 4px; background: #333; color: white; border: 1px solid #555;">
+                <option th:if="${currentProject == null}" value="" disabled selected>Select Project...</option>
+                <option th:each="p : ${allProjects}" th:value="${p.id}" th:text="${p.name}"
+                    th:selected="${currentProject != null && p.id == currentProject.id}"></option>
+            </select>
+        </div>
+    </div>
     <nav th:fragment="sidebar(activePage)" class="sidebar" id="sidebar">
         <button class="close-btn" onclick="toggleSidebar()">&times;</button>
         <ul>
@@ -380,16 +400,8 @@
                 <input type="text" id="name" name="name" required autocomplete="off" th:value="${status.name}">
             </div>
 
-            <div class="form-group" th:if="${status.project == null || projects != null}">
-                <!-- Show dropdown if creating new status via generic button -->
-                <label for="projectId">Project</label>
-                <select id="projectId" name="projectId" class="project-select" required>
-                    <option th:each="p : ${projects}" th:value="${p.id}" th:text="${p.name}"
-                        th:selected="${status.project != null && p.id == status.project.id}"></option>
-                </select>
-            </div>
-            <input type="hidden" name="projectId" th:if="${status.project != null && projects == null}"
-                th:value="${status.project.id}" />
+            <!-- Project ID is now inferred from session context -->
+            <!-- <input type="hidden" name="projectId" th:if="${status.project != null}" th:value="${status.project.id}" /> -->
 
             <div class="btn-group">
                 <button type="button" class="secondary"

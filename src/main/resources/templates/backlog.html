@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 
-<head th:replace="~{fragments :: head(title='Scroom - Backlog')}"></head>
+<head th:replace="~{fragments :: head(title='Go Do It - Backlog')}"></head>
 
 <body>
 
@@ -9,13 +9,8 @@
 
     <nav th:replace="~{fragments :: sidebar(activePage='backlog')}"></nav>
 
-    <div class="header">
-        <div class="header-left">
-            <button class="hamburger-btn" onclick="toggleSidebar()">&#9776;</button>
-            <h1>Backlog</h1>
-        </div>
-        <button class="add-btn" hx-get="/stories/form?view=backlog" hx-target="#modal-content"
-            hx-on::after-request="document.getElementById('create-modal').showModal()">+</button>
+    <div
+        th:replace="~{fragments :: header(title='Backlog', activePage='backlog', addButtonUrl='/stories/form?view=backlog')}">
     </div>
 
     <div class="container">

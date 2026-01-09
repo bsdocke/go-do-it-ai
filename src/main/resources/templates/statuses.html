@@ -9,13 +9,7 @@
 
     <nav th:replace="~{fragments :: sidebar(activePage='statuses')}"></nav>
 
-    <div class="header">
-        <div class="header-left">
-            <button class="hamburger-btn" onclick="toggleSidebar()">&#9776;</button>
-            <h1>Statuses</h1>
-        </div>
-        <button class="add-btn" hx-get="/statuses/form" hx-target="#modal-content"
-            hx-on::after-request="document.getElementById('create-modal').showModal()">+</button>
+    <div th:replace="~{fragments :: header(title='Statuses', activePage='statuses', addButtonUrl='/statuses/form')}">
     </div>
 
     <div class="container" style="padding: 20px; max-width: 100%; margin: 0;">

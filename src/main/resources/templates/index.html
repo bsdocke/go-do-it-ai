@@ -9,14 +9,7 @@
 
     <nav th:replace="~{fragments :: sidebar(activePage='board')}"></nav>
 
-    <div class="header">
-        <div class="header-left">
-            <button class="hamburger-btn" onclick="toggleSidebar()">&#9776;</button>
-            <h1>Go Do It</h1>
-        </div>
-        <button class="add-btn" hx-get="/stories/form" hx-target="#modal-content"
-            hx-on::after-request="document.getElementById('create-modal').showModal()">+</button>
-    </div>
+    <div th:replace="~{fragments :: header(title='Go Do It', activePage='board', addButtonUrl='/stories/form')}"></div>
 
     <div class="main-content">
         <th:block th:if="${#lists.isEmpty(boardData)}">

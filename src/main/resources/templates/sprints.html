@@ -9,14 +9,7 @@
 
     <nav th:replace="~{fragments :: sidebar(activePage='sprints')}"></nav>
 
-    <div class="header">
-        <div class="header-left">
-            <button class="hamburger-btn" onclick="toggleSidebar()">&#9776;</button>
-            <h1>Sprints</h1>
-        </div>
-        <button class="add-btn" hx-get="/sprints/form" hx-target="#modal-content"
-            hx-on::after-request="document.getElementById('create-modal').showModal()">+</button>
-    </div>
+    <div th:replace="~{fragments :: header(title='Sprints', activePage='sprints', addButtonUrl='/sprints/form')}"></div>
 
     <div class="container" style="padding: 20px; max-width: 800px; margin: 0 auto;">
         <div id="sprint-list" class="sprint-list" th:replace="~{fragments :: sprintList(sprints=${sprints})}">

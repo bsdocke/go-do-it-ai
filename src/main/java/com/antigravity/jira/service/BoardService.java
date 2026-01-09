@@ -86,6 +86,29 @@ public class BoardService {
         return projectRepository.findById(id).orElse(null);
     }
 
+    public List<UserStory> getBacklogStories(com.antigravity.jira.model.Project project) {
+        if (project == null)
+            return java.util.Collections.emptyList();
+        return userStoryRepository.findBySprintIsNullAndProjectOrderByIdAsc(project);
+    }
+
+    public List<Sprint> getSprintsForProject(com.antigravity.jira.model.Project project) {
+        if (project == null)
+            return java.util.Collections.emptyList();
+        return sprintRepository.findAll().stream()
+                .filter(s -> s.getProject() != null && s.getProject().getId().equals(project.getId()))
+                .collect(Collectors.toList());
+    }
+
+    public List<Sprint> getActiveSprintsForBoard(com.antigravity.jira.model.Project project, java.time.LocalDate date) {
+        if (project == null)
+            return java.util.Collections.emptyList();
+        List<Sprint> active = getActiveSprintsForBoard(date);
+        return active.stream()
+                .filter(s -> s.getProject() != null && s.getProject().getId().equals(project.getId()))
+                .collect(Collectors.toList());
+    }
+
     @Transactional
     public com.antigravity.jira.model.Project createProject(String name, String description) {
         return projectRepository.save(new com.antigravity.jira.model.Project(name, description));
@@ -225,8 +248,12 @@ public class BoardService {
     }
 
     @Transactional
-    public UserStory createStory(String title, String description, String assignee, Long sprintId) {
-        com.antigravity.jira.model.Project project = getDefaultProject();
+    public UserStory createStory(String title, String description, String assignee, Long sprintId,
+            com.antigravity.jira.model.Project project) {
+        if (project == null) {
+            project = getDefaultProject(); // Fallback if somehow null
+        }
+
         List<Status> projectStatuses = getStatusesForProject(project);
 
         if (projectStatuses.isEmpty()) {
@@ -297,13 +324,15 @@ public class BoardService {
 
     @Transactional
     public Sprint createSprint(String name, String description, java.time.LocalDate startDate,
-            java.time.LocalDate endDate) {
+            java.time.LocalDate endDate, com.antigravity.jira.model.Project project) {
         Sprint sprint = new Sprint();
         sprint.setName(name);
         sprint.setDescription(description);
         sprint.setStartDate(startDate);
         sprint.setEndDate(endDate);
-        sprint.setProject(getDefaultProject());
+        if (project == null)
+            project = getDefaultProject();
+        sprint.setProject(project);
 
         java.time.LocalDate now = java.time.LocalDate.now();
         boolean isActive = (startDate.isBefore(now) || startDate.equals(now))

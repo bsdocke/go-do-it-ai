@@ -22,22 +22,23 @@ public class BoardController {
         this.boardService = boardService;
     }
 
+    @PutMapping("/context/project")
+    public org.springframework.http.ResponseEntity<Void> switchProject(@RequestParam Long projectId,
+            jakarta.servlet.http.HttpSession session) {
+        session.setAttribute("projectId", projectId);
+        return org.springframework.http.ResponseEntity.ok().header("HX-Refresh", "true").build();
+    }
+
     @GetMapping("/")
     public String index(Model model) {
-        // List<Status> statuses = boardService.getAllStatuses(); // Unused
-        List<Sprint> activeSprints = boardService.getActiveSprintsForBoard(java.time.LocalDate.now());
+        com.antigravity.jira.model.Project currentProject = (com.antigravity.jira.model.Project) model
+                .getAttribute("currentProject");
+        if (currentProject == null) {
+            model.addAttribute("boardData", new ArrayList<>());
+            return "index";
+        }
 
-        // Statuses are now project specific, but for board view, we need to know WHICH
-        // project context we are in.
-        // It seems the view iterates over "boardData", which contains Sprints.
-        // Sprints belong to a Project. So each "Sprint Section" should know its
-        // statuses.
-        // The original code passed "statuses" globally. We should probably remove that
-        // global list
-        // OR if the board is only for "Active" sprints, and maybe we assume single
-        // project for now or refactor.
-        // Given requirements: "Current Sprint should source only statuses belonging to
-        // the project that the Sprint is linked to"
+        List<Sprint> activeSprints = boardService.getActiveSprintsForBoard(currentProject, java.time.LocalDate.now());
 
         // We will enrich boardData to include statuses for that sprint's project.
         List<Map<String, Object>> enrichedBoardData = new ArrayList<>();
@@ -57,21 +58,24 @@ public class BoardController {
             }
         }
 
-        // model.addAttribute("statuses", statuses); // REMOVED global statuses
         model.addAttribute("boardData", enrichedBoardData);
         return "index";
     }
 
     @GetMapping("/backlog")
     public String backlog(Model model) {
-        List<UserStory> stories = boardService.getBacklogStories();
+        com.antigravity.jira.model.Project currentProject = (com.antigravity.jira.model.Project) model
+                .getAttribute("currentProject");
+        List<UserStory> stories = boardService.getBacklogStories(currentProject);
         model.addAttribute("stories", stories);
         return "backlog";
     }
 
     @GetMapping("/sprints")
     public String sprints(Model model) {
-        model.addAttribute("sprints", boardService.getAllSprints());
+        com.antigravity.jira.model.Project currentProject = (com.antigravity.jira.model.Project) model
+                .getAttribute("currentProject");
+        model.addAttribute("sprints", boardService.getSprintsForProject(currentProject));
         return "sprints";
     }
 
@@ -83,56 +87,6 @@ public class BoardController {
         }
         model.addAttribute("sprint", sprint);
         return "fragments :: sprintForm(sprint=${sprint})";
-    }
-
-    @PostMapping("/sprints")
-    public String createSprint(@RequestParam String name,
-            @RequestParam(required = false) String description,
-            @RequestParam(required = false) String startDate,
-            @RequestParam(required = false) String endDate,
-            Model model) {
-        java.time.LocalDate start;
-        java.time.LocalDate end;
-
-        try {
-            if (startDate != null && !startDate.isEmpty()) {
-                start = java.time.LocalDate.parse(startDate);
-            } else {
-                start = java.time.LocalDate.now();
-            }
-            if (endDate != null && !endDate.isEmpty()) {
-                end = java.time.LocalDate.parse(endDate);
-            } else {
-                end = start.plusDays(14);
-            }
-        } catch (Exception e) {
-            start = java.time.LocalDate.now();
-            end = start.plusDays(14);
-        }
-
-        Sprint sprint = boardService.createSprint(name, description, start, end);
-        model.addAttribute("sprint", sprint);
-        return "fragments :: sprintRow(sprint=${sprint})";
-    }
-
-    @PutMapping("/sprints/{id}")
-    public String updateSprint(@PathVariable Long id,
-            @RequestParam String name,
-            @RequestParam(required = false) String description,
-            @RequestParam String startDate,
-            @RequestParam String endDate,
-            Model model) {
-        Sprint sprint = boardService.updateSprint(id, name, description, java.time.LocalDate.parse(startDate),
-                java.time.LocalDate.parse(endDate));
-        model.addAttribute("sprint", sprint);
-        return "fragments :: sprintRow(sprint=${sprint})";
-    }
-
-    @DeleteMapping("/sprints/{id}")
-    public String deleteSprint(@PathVariable Long id, Model model) {
-        boardService.deleteSprint(id);
-        model.addAttribute("sprints", boardService.getAllSprints());
-        return "fragments :: sprintList(sprints=${sprints})";
     }
 
     @PutMapping("/stories/{storyId}/move")
@@ -155,7 +109,9 @@ public class BoardController {
             @RequestParam(required = false) Long sprintId,
             @RequestParam(required = false, defaultValue = "board") String view,
             Model model) {
-        UserStory story = boardService.createStory(title, description, assignee, sprintId);
+        com.antigravity.jira.model.Project currentProject = (com.antigravity.jira.model.Project) model
+                .getAttribute("currentProject");
+        UserStory story = boardService.createStory(title, description, assignee, sprintId, currentProject);
         model.addAttribute("story", story);
 
         String oobTarget = null;
@@ -194,10 +150,14 @@ public class BoardController {
         if (id != null) {
             story = boardService.getStory(id);
         }
+        com.antigravity.jira.model.Project currentProject = (com.antigravity.jira.model.Project) model
+                .getAttribute("currentProject");
+        List<Sprint> activeSprints = boardService.getActiveSprintsForBoard(currentProject, java.time.LocalDate.now());
+
         model.addAttribute("story", story);
         model.addAttribute("view", view);
-        model.addAttribute("activeSprints", boardService.getActiveSprints());
-        return "fragments :: storyForm(story=${story})";
+        model.addAttribute("activeSprints", activeSprints);
+        return "fragments :: storyForm(story=${story}, activeSprints=${activeSprints}, view=${view}, projects=${projects})";
     }
 
     @PutMapping("/stories/{id}")
@@ -272,51 +232,90 @@ public class BoardController {
 
     // --- Status Management ---
 
+    @PostMapping("/sprints")
+    public String createSprint(@RequestParam String name,
+            @RequestParam(required = false) String description,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            Model model) {
+        java.time.LocalDate start;
+        java.time.LocalDate end;
+
+        try {
+            if (startDate != null && !startDate.isEmpty()) {
+                start = java.time.LocalDate.parse(startDate);
+            } else {
+                start = java.time.LocalDate.now();
+            }
+            if (endDate != null && !endDate.isEmpty()) {
+                end = java.time.LocalDate.parse(endDate);
+            } else {
+                end = java.time.LocalDate.now().plusWeeks(2);
+            }
+            com.antigravity.jira.model.Project currentProject = (com.antigravity.jira.model.Project) model
+                    .getAttribute("currentProject");
+            boardService.createSprint(name, description, start, end, currentProject);
+            // Return updated list
+            model.addAttribute("sprints", boardService.getSprintsForProject(currentProject));
+            // HTMX expects partials. We can return the list fragment.
+            return "fragments :: sprintList(sprints=${sprints})";
+        } catch (Exception e) {
+            // Handle error - simplistic
+            return "";
+        }
+    }
+
+    @PutMapping("/sprints/{id}")
+    public String updateSprint(@PathVariable Long id,
+            @RequestParam String name,
+            @RequestParam(required = false) String description,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            Model model) {
+        try {
+            java.time.LocalDate start = java.time.LocalDate.parse(startDate);
+            java.time.LocalDate end = java.time.LocalDate.parse(endDate);
+            boardService.updateSprint(id, name, description, start, end);
+
+            Sprint sprint = boardService.getSprint(id);
+            model.addAttribute("sprint", sprint);
+            return "fragments :: sprintRow(sprint=${sprint})";
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    @DeleteMapping("/sprints/{id}")
+    public org.springframework.http.ResponseEntity<String> deleteSprint(@PathVariable Long id) {
+        boardService.deleteSprint(id);
+        return org.springframework.http.ResponseEntity.ok("");
+    }
+
+    // Helper to allow returning View name for success is messy with mixed return
+    // types.
+
     @GetMapping("/statuses")
     public String statuses(Model model) {
-        // For simplicity, we might show statuses for the "Default Project" or all
-        // projects?
-        // Let's assume we list projects and their statuses?
-        // Or per the Prompt: "create a "Statuses" page... similar to Current Sprint
-        // page"
-        // "Tiles with the name of the Status will appear beneath the header... similar
-        // to columns"
-        // This implies we select a project context? Or maybe just use DefaultProject
-        // for now
-        // since the user didn't specify multi-project Navigation for this page.
-        // However, "Statuses in the DB must relate to a project".
-        // Let's pass all projects to the view, and maybe iterate them?
-        // Or Just show the first project's statuses for MVP as user context is
-        // ambiguous?
-        // Better: Show all projects and their statuses?
-        // Let's grab all projects.
-        model.addAttribute("projects", boardService.getAllProjects());
-        // And helper to get statuses per project?
-        // actually accessing service from view is bad.
-        // Let's pre-load a map?
-        Map<Long, List<Status>> projectStatuses = boardService.getAllProjects().stream()
-                .collect(Collectors.toMap(com.antigravity.jira.model.Project::getId,
-                        p -> boardService.getStatusesForProject(p)));
+        com.antigravity.jira.model.Project currentProject = (com.antigravity.jira.model.Project) model
+                .getAttribute("currentProject");
+
+        Map<Long, List<Status>> projectStatuses = new java.util.HashMap<>();
+        if (currentProject != null) {
+            projectStatuses.put(currentProject.getId(), boardService.getStatusesForProject(currentProject));
+            model.addAttribute("projects", List.of(currentProject));
+        } else {
+            model.addAttribute("projects", new ArrayList<>());
+        }
         model.addAttribute("projectStatuses", projectStatuses);
 
         return "statuses";
     }
 
     @GetMapping("/statuses/form")
-    public String getStatusForm(@RequestParam(required = false) Long id,
-            @RequestParam(required = false) Long projectId,
-            Model model) {
+    public String getStatusForm(@RequestParam(required = false) Long id, Model model) {
         Status status = new Status();
         if (id != null) {
             status = boardService.getStatus(id);
-        } else if (projectId != null) {
-            status.setProject(boardService.getProject(projectId));
-        } else {
-            // Default to first project if available, or just null (user must select)
-            List<com.antigravity.jira.model.Project> projects = boardService.getAllProjects();
-            if (!projects.isEmpty()) {
-                status.setProject(projects.get(0));
-            }
         }
 
         model.addAttribute("status", status);
@@ -325,20 +324,17 @@ public class BoardController {
     }
 
     @PostMapping("/statuses")
-    public Object createStatus(@RequestParam String name,
-            @RequestParam Long projectId, Model model) {
+    public Object createStatus(@RequestParam String name, Model model) {
         try {
-            com.antigravity.jira.model.Project project = boardService.getProject(projectId);
-            Status status = boardService.createStatus(name, project);
-            // Return column/tile with OOB swap to place it in correct list
+            com.antigravity.jira.model.Project currentProject = (com.antigravity.jira.model.Project) model
+                    .getAttribute("currentProject");
+            Status status = boardService.createStatus(name, currentProject);
             model.addAttribute("status", status);
             return "fragments :: statusRowOob(status=${status})";
         } catch (IllegalArgumentException e) {
             return org.springframework.http.ResponseEntity.badRequest().body(e.getMessage());
         }
     }
-
-    // Helper to allow returning View name for success is messy with mixed return
     // types.
     // Better approach: Use ExceptionHandler or just return ResponseEntity for both.
     // But rendering the template to string manually requires template engine
