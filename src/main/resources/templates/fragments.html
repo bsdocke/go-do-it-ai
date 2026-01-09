@@ -231,7 +231,9 @@
     </div>
 
     <!-- Project Components -->
-    <div th:fragment="projectRow(project)" class="sprint-row" th:id="'project-' + ${project.id}">
+    <div th:fragment="projectRow(project)" class="sprint-row" th:id="'project-' + ${project.id}" hx-trigger="click"
+        th:hx-get="@{/projects/form(id=${project.id})}" hx-target="#modal-content"
+        hx-on::after-request="document.getElementById('create-modal').showModal()">
         <div class="sprint-info">
             <h3 th:text="${project.name}" style="margin: 0 0 5px 0; color: #fff;">Project Name</h3>
             <div style="font-size: 0.9em; color: #aaa;">
@@ -239,13 +241,9 @@
             </div>
         </div>
         <div class="sprint-actions">
-            <!-- Edit Button: Opens Modal -->
-            <button class="icon-btn edit-btn" th:hx-get="@{/projects/form(id=${project.id})}" hx-target="#modal-content"
-                hx-on::after-request="document.getElementById('create-modal').showModal()" title="Edit Project">
-                ✎
-            </button>
+
             <button class="icon-btn delete-btn" th:hx-delete="@{/projects/{id}(id=${project.id})}"
-                th:hx-target="'#project-' + ${project.id}" hx-swap="outerHTML" hx-trigger="confirmed" onclick="Swal.fire({
+                th:hx-target="'#project-' + ${project.id}" hx-swap="outerHTML" hx-trigger="confirmed" onclick="event.preventDefault(); event.stopPropagation(); Swal.fire({
                     title: 'Delete Project?',
                     text: 'This will delete ALL Sprints and Stories in this project!',
                     icon: 'warning',
