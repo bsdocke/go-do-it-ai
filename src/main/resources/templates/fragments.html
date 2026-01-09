@@ -263,9 +263,29 @@
     </div>
 
     <div th:fragment="projectForm(project)">
-        <form id="project-form">
-            <button type="button" class="close-modal-btn"
-                onclick="document.getElementById('create-modal').close()">×</button>
+        <form id="project-form" style="position: relative;">
+            <button type="button" class="delete-btn" style="opacity: 1; top: 0; right: 0; font-size: 1.5em;"
+                th:if="${project.id == null}" onclick="document.getElementById('create-modal').close()">×</button>
+
+            <button type="button" class="delete-btn" style="opacity: 1; top: 0; right: 0; font-size: 1.5em;"
+                th:if="${project.id != null}" th:hx-delete="@{/projects/{id}(id=${project.id})}" hx-trigger="confirmed"
+                hx-target="this" hx-swap="none"
+                th:hx-on::after-request="|if(event.detail.successful) { document.getElementById('create-modal').close(); var c = document.getElementById('project-${project.id}'); if(c) c.remove(); }|"
+                onclick="event.preventDefault(); Swal.fire({
+                    title: 'Delete Project?',
+                    text: 'This will delete ALL Sprints and Stories in this project!',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#d33',
+                    confirmButtonText: 'Yes, delete everything!',
+                    heightAuto: false,
+                    target: document.getElementById('create-modal')
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        htmx.trigger(this, 'confirmed');
+                    }
+                })">×</button>
 
             <h2 style="margin-top:0" th:text="${project.id == null ? 'Create Project' : 'Edit Project'}">Create Project
             </h2>
