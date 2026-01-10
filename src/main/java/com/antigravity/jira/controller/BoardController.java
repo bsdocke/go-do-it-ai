@@ -12,6 +12,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import com.antigravity.jira.model.AppUser;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 
 @Controller
 public class BoardController {
@@ -29,13 +32,13 @@ public class BoardController {
         return org.springframework.http.ResponseEntity.ok().header("HX-Refresh", "true").build();
     }
 
-    @GetMapping("/")
-    public String index(Model model) {
+    @GetMapping("/current")
+    public String currentBoard(Model model) {
         com.antigravity.jira.model.Project currentProject = (com.antigravity.jira.model.Project) model
                 .getAttribute("currentProject");
         if (currentProject == null) {
             model.addAttribute("boardData", new ArrayList<>());
-            return "index";
+            return "current";
         }
 
         List<Sprint> activeSprints = boardService.getActiveSprintsForBoard(currentProject, java.time.LocalDate.now());
@@ -59,6 +62,14 @@ public class BoardController {
         }
 
         model.addAttribute("boardData", enrichedBoardData);
+        return "current";
+    }
+
+    @GetMapping("/")
+    public String landing(@AuthenticationPrincipal OAuth2User principal) {
+        if (principal != null) {
+            return "redirect:/current";
+        }
         return "index";
     }
 
@@ -189,8 +200,12 @@ public class BoardController {
     }
 
     @GetMapping("/projects")
-    public String projects(Model model) {
-        model.addAttribute("projects", boardService.getAllProjects());
+    public String projects(Model model, @AuthenticationPrincipal OAuth2User principal) {
+        // GlobalControllerAdvice adds currentUser, but we can also get it via principal
+        // if needed
+        // safer to use the service to ensure it's loaded bound to session logic if any
+        AppUser user = boardService.getOrCreateUser(principal.getAttribute("email"), principal.getAttribute("name"));
+        model.addAttribute("projects", boardService.getProjectsForUser(user));
         return "projects";
     }
 
@@ -205,17 +220,19 @@ public class BoardController {
     }
 
     @PostMapping("/projects")
-    public String createProject(@RequestParam String name,
+    public String createProject(@RequestParam("projectName") String name,
             @RequestParam(required = false) String description,
-            Model model) {
-        com.antigravity.jira.model.Project project = boardService.createProject(name, description);
+            Model model,
+            @AuthenticationPrincipal OAuth2User principal) {
+        AppUser user = boardService.getOrCreateUser(principal.getAttribute("email"), principal.getAttribute("name"));
+        com.antigravity.jira.model.Project project = boardService.createProject(name, description, user);
         model.addAttribute("project", project);
         return "fragments :: projectRow(project=${project})";
     }
 
     @PutMapping("/projects/{id}")
     public String updateProject(@PathVariable Long id,
-            @RequestParam String name,
+            @RequestParam("projectName") String name,
             @RequestParam(required = false) String description,
             Model model) {
         com.antigravity.jira.model.Project project = boardService.updateProject(id, name, description);
@@ -233,7 +250,7 @@ public class BoardController {
     // --- Status Management ---
 
     @PostMapping("/sprints")
-    public String createSprint(@RequestParam String name,
+    public String createSprint(@RequestParam("sprintName") String name,
             @RequestParam(required = false) String description,
             @RequestParam(required = false) String startDate,
             @RequestParam(required = false) String endDate,
@@ -267,7 +284,7 @@ public class BoardController {
 
     @PutMapping("/sprints/{id}")
     public String updateSprint(@PathVariable Long id,
-            @RequestParam String name,
+            @RequestParam("sprintName") String name,
             @RequestParam(required = false) String description,
             @RequestParam(required = false) String startDate,
             @RequestParam(required = false) String endDate,
@@ -324,7 +341,7 @@ public class BoardController {
     }
 
     @PostMapping("/statuses")
-    public Object createStatus(@RequestParam String name, Model model) {
+    public Object createStatus(@RequestParam("statusName") String name, Model model) {
         try {
             com.antigravity.jira.model.Project currentProject = (com.antigravity.jira.model.Project) model
                     .getAttribute("currentProject");
@@ -348,7 +365,7 @@ public class BoardController {
     // fine.
 
     @PutMapping("/statuses/{id}")
-    public Object updateStatus(@PathVariable Long id, @RequestParam String name, Model model) {
+    public Object updateStatus(@PathVariable Long id, @RequestParam("statusName") String name, Model model) {
         try {
             Status status = boardService.updateStatus(id, name);
             model.addAttribute("status", status);
@@ -373,6 +390,49 @@ public class BoardController {
     @ResponseBody
     public String reorderStatuses(@RequestParam("itemIds") List<Long> itemIds) {
         boardService.updateStatusOrdering(itemIds);
+        return "";
+    }
+
+    // --- Admin ---
+
+    @GetMapping("/admin")
+    public String adminPage(Model model, @AuthenticationPrincipal OAuth2User principal) {
+        // Simple security check (better via SecurityConfig but this works for now)
+        // GlobalControllerAdvice injects 'currentUser'
+        AppUser user = boardService.getOrCreateUser(principal.getAttribute("email"), principal.getAttribute("name"));
+        if (!"ADMIN".equals(user.getRole())) {
+            return "redirect:/";
+        }
+
+        // Admin sees all projects and their members
+        model.addAttribute("projects", boardService.getAllProjects());
+        return "admin";
+    }
+
+    @PostMapping("/admin/projects/{projectId}/members")
+    public String addProjectMember(@PathVariable Long projectId, @RequestParam("memberEmail") String email,
+            Model model) {
+        try {
+            boardService.addProjectMember(projectId, email);
+        } catch (IllegalArgumentException e) {
+            // ignore or show error
+        }
+        // return updated list for that project card
+        // Ideally we return just the member list or the whole project card
+        // The admin.html expects "closest div" swap, so let's return a project
+        // fragment??
+        // actually admin.html replaces 'closest div' which is the project card in the
+        // list
+        // We don't have a specific fragment for admin project row yet.
+        // Let's reload the page for MVP or create a fragment on the fly?
+        // Let's redirect to /admin to be safe and simple
+        return "redirect:/admin";
+    }
+
+    @DeleteMapping("/admin/projects/{projectId}/members/{uid}")
+    @ResponseBody
+    public String removeProjectMember(@PathVariable Long projectId, @PathVariable Long uid) {
+        boardService.removeProjectMember(projectId, uid);
         return "";
     }
 }

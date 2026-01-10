@@ -2,7 +2,9 @@ package com.antigravity.jira.model;
 
 import jakarta.persistence.*;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 public class Project {
@@ -24,6 +26,10 @@ public class Project {
 
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Status> statuses = new ArrayList<>();
+
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(name = "project_members", joinColumns = @JoinColumn(name = "project_id"), inverseJoinColumns = @JoinColumn(name = "user_id"))
+    private Set<AppUser> members = new HashSet<>();
 
     public Project() {
     }
@@ -79,5 +85,28 @@ public class Project {
 
     public void setStatuses(List<Status> statuses) {
         this.statuses = statuses;
+    }
+
+    public Set<AppUser> getMembers() {
+        return members;
+    }
+
+    public void setMembers(Set<AppUser> members) {
+        this.members = members;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o)
+            return true;
+        if (!(o instanceof Project))
+            return false;
+        Project project = (Project) o;
+        return id != null && id.equals(project.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return getClass().hashCode();
     }
 }

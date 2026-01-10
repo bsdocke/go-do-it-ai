@@ -1,13 +1,19 @@
 package com.antigravity.jira.service;
 
+import com.antigravity.jira.model.AppUser;
+import com.antigravity.jira.model.Project;
+import com.antigravity.jira.model.Sprint;
 import com.antigravity.jira.model.Status;
 import com.antigravity.jira.model.UserStory;
+import com.antigravity.jira.repository.AppUserRepository;
+import com.antigravity.jira.repository.ProjectRepository;
+import com.antigravity.jira.repository.SprintRepository;
 import com.antigravity.jira.repository.StatusRepository;
 import com.antigravity.jira.repository.UserStoryRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.antigravity.jira.model.Sprint;
+import jakarta.annotation.PostConstruct;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -17,22 +23,64 @@ public class BoardService {
 
     private final StatusRepository statusRepository;
     private final UserStoryRepository userStoryRepository;
-    private final com.antigravity.jira.repository.SprintRepository sprintRepository;
-    private final com.antigravity.jira.repository.ProjectRepository projectRepository;
+    private final SprintRepository sprintRepository;
+    private final ProjectRepository projectRepository;
+    private final AppUserRepository appUserRepository;
 
-    public BoardService(StatusRepository statusRepository, UserStoryRepository userStoryRepository,
-            com.antigravity.jira.repository.SprintRepository sprintRepository,
-            com.antigravity.jira.repository.ProjectRepository projectRepository) {
-        this.statusRepository = statusRepository;
+    public BoardService(UserStoryRepository userStoryRepository, SprintRepository sprintRepository,
+            StatusRepository statusRepository, ProjectRepository projectRepository,
+            AppUserRepository appUserRepository) {
         this.userStoryRepository = userStoryRepository;
         this.sprintRepository = sprintRepository;
+        this.statusRepository = statusRepository;
         this.projectRepository = projectRepository;
+        this.appUserRepository = appUserRepository;
     }
 
     @jakarta.annotation.PostConstruct
     public void init() {
+        // Deduplicate Users if any exist (Fix for NonUniqueResultException)
+        // Group by email, keep the one with lowest ID, delete others
+        java.util.List<AppUser> allUsers = appUserRepository.findAll();
+        java.util.Map<String, java.util.List<AppUser>> usersByEmail = allUsers.stream()
+                .collect(Collectors.groupingBy(AppUser::getEmail));
+
+        for (java.util.Map.Entry<String, java.util.List<AppUser>> entry : usersByEmail.entrySet()) {
+            java.util.List<AppUser> duplicates = entry.getValue();
+            if (duplicates.size() > 1) {
+                // Sort by ID to keep the oldest
+                duplicates.sort(java.util.Comparator.comparing(AppUser::getId));
+                AppUser keep = duplicates.get(0);
+
+                for (int i = 1; i < duplicates.size(); i++) {
+                    // Remove from projects first to avoid FK constraint issues?
+                    // But duplicates might be in project_members too.
+                    // Let's just delete the user, cascade should handle it?
+                    // Actually Project.members is ManyToMany, mapped by join table.
+                    // We should probably rely on manual cleanup if CascadeType.ALL is on Project
+                    // side?
+                    // Let's just try deleting the user.
+                    // Wait, we need to remove them from any projects they are in to be safe.
+                    AppUser dupe = duplicates.get(i);
+                    // We can't easily find projects for a user without a reverse lookup or scan.
+                    // Since this is a patch, let's scan all projects.
+                    for (com.antigravity.jira.model.Project p : projectRepository.findAll()) {
+                        if (p.getMembers().removeIf(m -> m.getId().equals(dupe.getId()))) {
+                            // If removed, save project
+                            projectRepository.save(p);
+                        }
+                    }
+                    appUserRepository.delete(dupe);
+                }
+            }
+        }
+
         if (projectRepository.count() == 0) {
-            com.antigravity.jira.model.Project initialProject = new com.antigravity.jira.model.Project(
+            // This init logic is for migrating old data or setting up a first project
+            // if no projects exist.
+            // With user-aware project creation, this might be less critical,
+            // but kept for initial setup or migration.
+            Project initialProject = new Project(
                     "Initial Project",
                     "Migration Project for existing data");
             initialProject = projectRepository.save(initialProject);
@@ -69,6 +117,42 @@ public class BoardService {
             }
         }
     }
+
+    public List<UserStory> getAllStories() {
+        return userStoryRepository.findAll();
+    }
+
+    // --- User Sync and RBAC ---
+
+    public AppUser getOrCreateUser(String email, String name) {
+        List<AppUser> users = appUserRepository.findByEmail(email);
+        if (users.isEmpty()) {
+            boolean isFirstUser = appUserRepository.count() == 0;
+            String role = isFirstUser ? "ADMIN" : "USER";
+            return appUserRepository.save(new AppUser(email, name, role));
+        }
+        // Handle duplicates if they exist
+        if (users.size() > 1) {
+            // Log warning?
+            // Return the first one (oldest by ID usually if simpler)
+            // Or sort by ID
+            users.sort(java.util.Comparator.comparing(AppUser::getId));
+            // We could delete others here too, but let's just be safe and return one.
+            return users.get(0);
+        }
+        return users.get(0);
+    }
+
+    public List<com.antigravity.jira.model.Project> getProjectsForUser(AppUser user) {
+        if ("ADMIN".equals(user.getRole())) {
+            return projectRepository.findAll(org.springframework.data.domain.Sort.by("name"));
+        }
+        return projectRepository.findAll(org.springframework.data.domain.Sort.by("name")).stream()
+                .filter(p -> p.getMembers().stream().anyMatch(m -> m.getId().equals(user.getId())))
+                .collect(Collectors.toList());
+    }
+
+    // --- Project Management ---
 
     public com.antigravity.jira.model.Project getDefaultProject() {
         List<com.antigravity.jira.model.Project> projects = projectRepository.findAll();
@@ -115,6 +199,13 @@ public class BoardService {
     }
 
     @Transactional
+    public com.antigravity.jira.model.Project createProject(String name, String description, AppUser owner) {
+        com.antigravity.jira.model.Project project = new com.antigravity.jira.model.Project(name, description);
+        project.getMembers().add(owner);
+        return projectRepository.save(project);
+    }
+
+    @Transactional
     public com.antigravity.jira.model.Project updateProject(Long id, String name, String description) {
         com.antigravity.jira.model.Project project = getProject(id);
         if (project != null) {
@@ -122,12 +213,39 @@ public class BoardService {
             project.setDescription(description);
             return projectRepository.save(project);
         }
-        return null;
+        return null; // or throw
     }
 
     @Transactional
     public void deleteProject(Long id) {
         projectRepository.deleteById(id);
+    }
+
+    @Transactional
+    public void addProjectMember(Long projectId, String email) {
+        Project project = getProject(projectId);
+        List<AppUser> users = appUserRepository.findByEmail(email);
+
+        if (users.isEmpty()) {
+            throw new IllegalArgumentException("User not found with email: " + email);
+        }
+
+        // Pick the first one if duplicates exist
+        AppUser user = users.get(0);
+        if (users.size() > 1) {
+            users.sort(java.util.Comparator.comparing(AppUser::getId));
+            user = users.get(0);
+        }
+
+        project.getMembers().add(user);
+        // Transactional annotation handles the save/flush
+    }
+
+    @Transactional
+    public void removeProjectMember(Long projectId, Long userId) {
+        Project project = getProject(projectId);
+        project.getMembers().removeIf(m -> m.getId().equals(userId));
+        projectRepository.save(project);
     }
 
     public List<Status> getAllStatuses() {
@@ -213,10 +331,6 @@ public class BoardService {
                 statusRepository.save(s);
             });
         }
-    }
-
-    public List<UserStory> getAllStories() {
-        return userStoryRepository.findAll();
     }
 
     public List<UserStory> getStoriesByStatus(Status status) {

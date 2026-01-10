@@ -12,6 +12,16 @@
         <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
         <script th:src="@{/js/main.js}"></script>
+        <!-- CSRF Token -->
+        <meta name="_csrf" th:content="${_csrf.token}" />
+        <meta name="_csrf_header" th:content="${_csrf.headerName}" />
+        <script>
+            document.addEventListener('htmx:configRequest', function (evt) {
+                var header = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+                var token = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+                evt.detail.headers[header] = token;
+            });
+        </script>
     </head>
 
     <!-- Shared Header Fragment -->
@@ -43,6 +53,8 @@
             <li><a href="/sprints" th:classappend="${activePage == 'sprints' ? 'active' : ''}">Sprints</a></li>
             <li><a href="/projects" th:classappend="${activePage == 'projects' ? 'active' : ''}">Projects</a></li>
             <li><a href="/statuses" th:classappend="${activePage == 'statuses' ? 'active' : ''}">Statuses</a></li>
+            <li th:if="${currentUser != null && currentUser.role == 'ADMIN'}"><a href="/admin"
+                    th:classappend="${activePage == 'admin' ? 'active' : ''}">Admin</a></li>
         </ul>
     </nav>
 
@@ -218,7 +230,7 @@
 
             <div class="form-group">
                 <label for="name">Name</label>
-                <input type="text" id="name" name="name" required autocomplete="off" th:value="${sprint.name}">
+                <input type="text" id="name" name="sprintName" required autocomplete="off" th:value="${sprint.name}">
             </div>
 
             <div class="form-group">
@@ -313,7 +325,7 @@
 
             <div class="form-group">
                 <label for="name">Name</label>
-                <input type="text" id="name" name="name" required autocomplete="off" th:value="${project.name}">
+                <input type="text" id="name" name="projectName" required autocomplete="off" th:value="${project.name}">
             </div>
 
             <div class="form-group">
@@ -397,7 +409,7 @@
             <h2 style="margin-top:0" th:text="${status.id == null ? 'Create Status' : 'Edit Status'}">Create Status</h2>
             <div class="form-group">
                 <label for="name">Name</label>
-                <input type="text" id="name" name="name" required autocomplete="off" th:value="${status.name}">
+                <input type="text" id="name" name="statusName" required autocomplete="off" th:value="${status.name}">
             </div>
 
             <!-- Project ID is now inferred from session context -->

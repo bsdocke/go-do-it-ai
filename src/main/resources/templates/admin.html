@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head th:replace="~{fragments :: head('Admin Dashboard')}"></head>
+
+<body>
+    <!-- Replace the sidebar fragment -->
+    <nav th:replace="~{fragments :: sidebar('admin')}"></nav>
+
+    <div class="main-content">
+        <div th:replace="~{fragments :: header('Admin Dashboard', 'admin', null)}"></div>
+
+        <div class="board-container" style="padding: 20px;">
+            <div class="card"
+                style="max-width: 800px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px;">
+                <h2>Project Memberships</h2>
+
+                <div th:each="project : ${projects}"
+                    style="margin-bottom: 30px; border-bottom: 1px solid #eee; padding-bottom: 20px;">
+                    <h3 th:text="${project.name}">Project Name</h3>
+                    <p th:text="${project.description}" style="color: #666;"></p>
+
+                    <h4>Members</h4>
+                    <ul style="list-style: none; padding: 0;">
+                        <li th:each="member : ${project.members}"
+                            style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0;">
+                            <span th:text="${member.name + ' (' + member.email + ')'}">User Name</span>
+                            <button type="button"
+                                style="background: none; border: none; color: #dc3545; font-weight: bold; font-size: 1.5em; cursor: pointer; padding: 0 5px;"
+                                title="Remove User"
+                                th:hx-delete="@{/admin/projects/{pid}/members/{uid}(pid=${project.id},uid=${member.id})}"
+                                hx-trigger="confirmed" hx-target="closest li" hx-swap="outerHTML" onclick="event.preventDefault(); Swal.fire({
+                                    title: 'Remove Member?',
+                                    text: 'Are you sure you want to remove this user from the project?',
+                                    icon: 'warning',
+                                    showCancelButton: true,
+                                    confirmButtonColor: '#d33',
+                                    cancelButtonColor: '#3085d6',
+                                    confirmButtonText: 'Yes, remove!',
+                                    heightAuto: false
+                                }).then((result) => {
+                                    if (result.isConfirmed) {
+                                        htmx.trigger(this, 'confirmed');
+                                    }
+                                })">&minus;</button>
+                        </li>
+                    </ul>
+
+                    <form th:hx-post="@{/admin/projects/{id}/members(id=${project.id})}" hx-target="body"
+                        style="margin-top: 10px; display: flex; gap: 10px;">
+                        <input type="email" name="memberEmail" placeholder="User Email to Add" required
+                            style="flex-grow: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        <button type="submit" class="save-btn">Add Member</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -17,28 +17,42 @@ public class GlobalControllerAdvice {
         this.boardService = boardService;
     }
 
+    @ModelAttribute("currentUser")
+    public com.antigravity.jira.model.AppUser populateUser(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.oauth2.core.user.OAuth2User principal) {
+        if (principal == null) {
+            return null;
+        }
+        String email = principal.getAttribute("email");
+        String name = principal.getAttribute("name");
+        return boardService.getOrCreateUser(email, name);
+    }
+
     @ModelAttribute("allProjects")
-    public List<Project> populateProjects() {
-        return boardService.getAllProjects();
+    public List<Project> populateProjects(@ModelAttribute("currentUser") com.antigravity.jira.model.AppUser user) {
+        if (user == null) {
+            return java.util.Collections.emptyList();
+        }
+        return boardService.getProjectsForUser(user);
     }
 
     @ModelAttribute("currentProject")
-    public Project populateCurrentProject(HttpSession session) {
-        List<Project> allProjects = boardService.getAllProjects();
-        if (allProjects.isEmpty()) {
+    public Project populateCurrentProject(HttpSession session, @ModelAttribute("allProjects") List<Project> projects) {
+        if (projects.isEmpty()) {
             return null;
         }
 
         Long projectId = (Long) session.getAttribute("projectId");
         if (projectId != null) {
-            Project project = boardService.getProject(projectId);
+            // Validate the user still has access to this project
+            Project project = projects.stream().filter(p -> p.getId().equals(projectId)).findFirst().orElse(null);
             if (project != null) {
                 return project;
             }
         }
 
         // Default to first project if session is empty or invalid
-        Project defaultProject = allProjects.get(0);
+        Project defaultProject = projects.get(0);
         session.setAttribute("projectId", defaultProject.getId());
         return defaultProject;
     }
