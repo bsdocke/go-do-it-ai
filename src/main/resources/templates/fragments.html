@@ -36,7 +36,7 @@
                 th:title="${currentProject == null ? 'Project required' : 'Add New'}">+</button>
         </div>
 
-        <div th:if="${activePage != 'projects'}" style="position: absolute; right: 0;">
+        <div th:if="${activePage != 'projects'}" style="position: absolute; right: 10px;">
             <select name="projectId" hx-put="/context/project" hx-trigger="change" class="project-select-header"
                 style="padding: 5px; border-radius: 4px; background: #333; color: white; border: 1px solid #555;">
                 <option th:if="${currentProject == null}" value="" disabled selected>Select Project...</option>
