@@ -220,14 +220,19 @@ public class BoardController {
     }
 
     @PostMapping("/projects")
-    public String createProject(@RequestParam("projectName") String name,
+    public Object createProject(@RequestParam("projectName") String name,
             @RequestParam(required = false) String description,
             Model model,
             @AuthenticationPrincipal OAuth2User principal) {
-        AppUser user = boardService.getOrCreateUser(principal.getAttribute("email"), principal.getAttribute("name"));
-        com.antigravity.jira.model.Project project = boardService.createProject(name, description, user);
-        model.addAttribute("project", project);
-        return "fragments :: projectRow(project=${project})";
+        try {
+            AppUser user = boardService.getOrCreateUser(principal.getAttribute("email"),
+                    principal.getAttribute("name"));
+            com.antigravity.jira.model.Project project = boardService.createProject(name, description, user);
+            model.addAttribute("project", project);
+            return "fragments :: projectRow(project=${project})";
+        } catch (IllegalStateException e) {
+            return org.springframework.http.ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     @PutMapping("/projects/{id}")
@@ -411,22 +416,18 @@ public class BoardController {
 
     @PostMapping("/admin/projects/{projectId}/members")
     public String addProjectMember(@PathVariable Long projectId, @RequestParam("memberEmail") String email,
-            Model model) {
+            Model model, @AuthenticationPrincipal OAuth2User principal) {
         try {
             boardService.addProjectMember(projectId, email);
-        } catch (IllegalArgumentException e) {
-            // ignore or show error
+            return "redirect:/admin";
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            // Reload admin page with error
+            AppUser user = boardService.getOrCreateUser(principal.getAttribute("email"),
+                    principal.getAttribute("name"));
+            model.addAttribute("projects", boardService.getAllProjects());
+            model.addAttribute("errorMessage", e.getMessage());
+            return "admin";
         }
-        // return updated list for that project card
-        // Ideally we return just the member list or the whole project card
-        // The admin.html expects "closest div" swap, so let's return a project
-        // fragment??
-        // actually admin.html replaces 'closest div' which is the project card in the
-        // list
-        // We don't have a specific fragment for admin project row yet.
-        // Let's reload the page for MVP or create a fragment on the fly?
-        // Let's redirect to /admin to be safe and simple
-        return "redirect:/admin";
     }
 
     @DeleteMapping("/admin/projects/{projectId}/members/{uid}")

@@ -57,6 +57,14 @@
             </div>
         </div>
     </div>
+    <script th:if="${errorMessage != null}" th:inline="javascript">
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: /*[[${errorMessage}]]*/ 'Error message',
+            confirmButtonColor: '#3085d6'
+        });
+    </script>
 </body>
 
 </html>

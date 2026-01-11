@@ -341,7 +341,7 @@
                     th:hx-put="${project.id != null ? '/projects/' + project.id : ''}"
                     th:hx-target="${project.id == null ? '#project-list' : '#project-' + project.id}"
                     th:hx-swap="${project.id == null ? 'afterbegin' : 'outerHTML'}"
-                    hx-on::after-request="if(event.detail.successful) { document.getElementById('create-modal').close(); }">Save</button>
+                    hx-on::after-request="if(event.detail.successful) { document.getElementById('create-modal').close(); } else { Swal.fire({ icon: 'error', title: 'Error', text: event.detail.xhr.responseText, confirmButtonColor: '#3085d6', target: document.getElementById('create-modal') }); }">Save</button>
             </div>
         </form>
     </div>

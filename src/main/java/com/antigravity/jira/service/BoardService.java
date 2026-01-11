@@ -198,8 +198,16 @@ public class BoardService {
         return projectRepository.save(new com.antigravity.jira.model.Project(name, description));
     }
 
+    private static final int MAX_PROJECTS_PER_USER = 5;
+
     @Transactional
     public com.antigravity.jira.model.Project createProject(String name, String description, AppUser owner) {
+        if (!"ADMIN".equals(owner.getRole())) {
+            List<com.antigravity.jira.model.Project> userProjects = getProjectsForUser(owner);
+            if (userProjects.size() >= MAX_PROJECTS_PER_USER) {
+                throw new IllegalStateException("Project limit reached (Max " + MAX_PROJECTS_PER_USER + ")");
+            }
+        }
         com.antigravity.jira.model.Project project = new com.antigravity.jira.model.Project(name, description);
         project.getMembers().add(owner);
         return projectRepository.save(project);
@@ -235,6 +243,14 @@ public class BoardService {
         if (users.size() > 1) {
             users.sort(java.util.Comparator.comparing(AppUser::getId));
             user = users.get(0);
+        }
+
+        if (!"ADMIN".equals(user.getRole())) {
+            List<com.antigravity.jira.model.Project> userProjects = getProjectsForUser(user);
+            if (userProjects.size() >= MAX_PROJECTS_PER_USER) {
+                throw new IllegalStateException(
+                        "User has reached the maximum project limit (" + MAX_PROJECTS_PER_USER + ")");
+            }
         }
 
         project.getMembers().add(user);
