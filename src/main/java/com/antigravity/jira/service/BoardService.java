@@ -20,7 +20,9 @@ import com.antigravity.jira.repository.ProjectRepository;
 import com.antigravity.jira.repository.SprintRepository;
 import com.antigravity.jira.repository.StatusRepository;
 import com.antigravity.jira.repository.UserStoryRepository;
+import com.antigravity.jira.repository.CommentRepository;
 import com.antigravity.jira.exception.UserStoryException;
+import com.antigravity.jira.model.Comment;
 
 @Service
 public class BoardService {
@@ -33,15 +35,17 @@ public class BoardService {
     private final SprintRepository sprintRepository;
     private final ProjectRepository projectRepository;
     private final AppUserRepository appUserRepository;
+    private final CommentRepository commentRepository;
 
     public BoardService(UserStoryRepository userStoryRepository, SprintRepository sprintRepository,
             StatusRepository statusRepository, ProjectRepository projectRepository,
-            AppUserRepository appUserRepository) {
+            AppUserRepository appUserRepository, CommentRepository commentRepository) {
         this.userStoryRepository = userStoryRepository;
         this.sprintRepository = sprintRepository;
         this.statusRepository = statusRepository;
         this.projectRepository = projectRepository;
         this.appUserRepository = appUserRepository;
+        this.commentRepository = commentRepository;
     }
 
     @jakarta.annotation.PostConstruct
@@ -332,7 +336,7 @@ public class BoardService {
     }
 
     @Transactional
-    public UserStory createStory(String title, String description, String assignee, Long sprintId,
+    public UserStory createStory(String title, String description, String assignee, Integer points, Long sprintId,
             com.antigravity.jira.model.Project project) {
         if (project == null) {
             project = getDefaultProject(); // Fallback if somehow null
@@ -351,6 +355,7 @@ public class BoardService {
         story.setTitle(title);
         story.setDescription(description);
         story.setAssignee(assignee);
+        story.setPoints(points);
         story.setStatus(defaultStatus);
         story.setProject(project);
 
@@ -362,13 +367,15 @@ public class BoardService {
     }
 
     @Transactional
-    public UserStory updateStoryDetails(Long id, String title, String description, String assignee, Long sprintId) {
+    public UserStory updateStoryDetails(Long id, String title, String description, String assignee, Integer points,
+            Long sprintId) {
         Optional<UserStory> storyOpt = userStoryRepository.findById(id);
         if (storyOpt.isPresent()) {
             UserStory story = storyOpt.get();
             story.setTitle(title);
             story.setDescription(description);
             story.setAssignee(assignee);
+            story.setPoints(points);
 
             if (sprintId != null) {
                 sprintRepository.findById(sprintId).ifPresent(story::setSprint);
@@ -467,5 +474,21 @@ public class BoardService {
 
     public Status getStatus(Long id) {
         return statusRepository.findById(id).orElse(null);
+    }
+
+    @Transactional
+    public Comment commentOnStory(Long storyId, String text, AppUser user) {
+        Optional<UserStory> storyOpt = userStoryRepository.findById(storyId);
+        if (storyOpt.isPresent()) {
+            Comment comment = new Comment(text, storyOpt.get());
+            comment.setCreatedBy(user);
+            return commentRepository.save(comment);
+        }
+        throw new IllegalArgumentException("User story not found id: " + storyId);
+    }
+
+    @Transactional
+    public void deleteComment(Long commentId) {
+        commentRepository.deleteById(commentId);
     }
 }

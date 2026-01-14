@@ -18,7 +18,12 @@ public class Comment {
     @JoinColumn(name = "user_story_id", nullable = false)
     private UserStory userStory;
 
-    public Comment() {}
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by_user_id")
+    private AppUser createdBy;
+
+    public Comment() {
+    }
 
     public Comment(String text, UserStory userStory) {
         this.text = text;
@@ -55,5 +60,13 @@ public class Comment {
 
     public void setUserStory(UserStory userStory) {
         this.userStory = userStory;
+    }
+
+    public AppUser getCreatedBy() {
+        return createdBy;
+    }
+
+    public void setCreatedBy(AppUser createdBy) {
+        this.createdBy = createdBy;
     }
 }

@@ -61,6 +61,11 @@
     <div th:fragment="card(story, oobTarget)" class="card" th:id="'card-' + ${story.id}" th:data-id="${story.id}"
         hx-trigger="click" th:hx-get="@{/stories/form(id=${story.id}, view='board')}" hx-target="#modal-content"
         hx-on::after-request="document.getElementById('create-modal').showModal()" th:hx-swap-oob="${oobTarget}">
+        <div style="display: flex; align-items: start; gap: 5px; margin-right: 25px;">
+            <div style="background: #555; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; font-weight: bold; flex-shrink: 0;"
+                th:if="${story.points != null}" th:text="${story.points}"></div>
+            <span class="card-title" th:text="${story.title}" style="display: block;">Story Title</span>
+        </div>
         <button type="button" class="delete-btn" th:hx-delete="@{/stories/{id}(id=${story.id})}" hx-trigger="confirmed"
             hx-target="closest .card" hx-swap="outerHTML" onclick="event.preventDefault(); event.stopPropagation(); Swal.fire({
                 title: 'Are you sure?',
@@ -75,8 +80,14 @@
                 if (result.isConfirmed) {
                     htmx.trigger(this, 'confirmed');
                 }
-            })">×</button>
-        <span class="card-title" th:text="${story.title}">Story Title</span>
+            })"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor"
+                viewBox="0 0 16 16">
+                <path
+                    d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z" />
+                <path fill-rule="evenodd"
+                    d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z" />
+            </svg></button>
+
         <span class="card-desc" th:text="${#strings.abbreviate(story.description, 120)}">Description...</span>
         <span class="card-assignee" th:text="${story.assignee != null ? story.assignee : 'Unassigned'}">Assignee</span>
     </div>
@@ -130,30 +141,24 @@
                     if (result.isConfirmed) {
                         htmx.trigger(this, 'confirmed');
                     }
-                })">×</button>
-            <h2 style="margin-top:0" th:text="${story.id == null ? 'Create User Story' : 'Edit User Story'}">Create User
+                })"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor"
+                    viewBox="0 0 16 16">
+                    <path
+                        d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z" />
+                    <path fill-rule="evenodd"
+                        d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z" />
+                </svg></button>
+            <div style="position: absolute; top: 0; left: 0;" th:if="${story.id != null}">
+                <a th:href="@{/story/{id}(id=${story.id})}" target="_blank"
+                    style="text-decoration: none; color: #aaa; font-size: 1.2em; padding: 5px;" title="Open in new tab"
+                    onclick="event.stopPropagation();">
+                    &#x2197; <!-- North East Arrow -->
+                </a>
+            </div>
+            <h2 style="margin-top:0; text-align: center; padding: 0 40px;"
+                th:text="${story.id == null ? 'Create User Story' : 'Edit User Story'}">Create User
                 Story</h2>
-            <div class="form-group">
-                <label for="title">Title</label>
-                <input type="text" id="title" name="title" required autocomplete="off" th:value="${story.title}">
-            </div>
-            <div class="form-group">
-                <label for="description">Description</label>
-                <textarea id="description" name="description" required th:text="${story.description}"></textarea>
-            </div>
-            <div class="form-group">
-                <label for="assignee">Assignee</label>
-                <input type="text" id="assignee" name="assignee" required autocomplete="off"
-                    th:value="${story.assignee}">
-            </div>
-            <div class="form-group">
-                <label for="sprintId">Sprint (Optional)</label>
-                <select id="sprintId" name="sprintId">
-                    <option value="">-- No Sprint --</option>
-                    <option th:each="sprint : ${activeSprints}" th:value="${sprint.id}" th:text="${sprint.name}"
-                        th:selected="${story.sprint != null && story.sprint.id == sprint.id}"></option>
-                </select>
-            </div>
+            <div th:replace="~{fragments :: storyFields(story=${story}, activeSprints=${activeSprints})}"></div>
             <div class="btn-group">
                 <button type="button" class="secondary"
                     onclick="document.getElementById('create-modal').close()">Cancel</button>
@@ -163,7 +168,108 @@
                     th:hx-swap="${story.id == null ? 'none' : 'outerHTML'}"
                     hx-on::after-request="if(event.detail.successful) { document.getElementById('create-modal').close(); }">Save</button>
             </div>
+
+            <div th:if="${story.id != null}" style="margin-top: 20px; border-top: 1px solid #444; padding-top: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h3 style="margin: 0;">Comments</h3>
+                    <button type="button" class="add-btn" style="font-size: 1.2em; padding: 0 10px;"
+                        th:hx-get="@{/stories/{id}/comments/form(id=${story.id})}" hx-target="#comment-modal-content"
+                        hx-on::after-request="document.getElementById('comment-modal').showModal()">+</button>
+                </div>
+
+                <div id="comment-list"
+                    style="max-height: 200px; overflow-y: auto; border: 1px solid #444; border-radius: 4px; padding: 10px; background: #222;">
+                    <div th:replace="~{fragments :: commentList(story=${story})}"></div>
+                </div>
+            </div>
         </form>
+    </div>
+
+    <!-- Comment Fragments -->
+    <div th:fragment="commentList(story)">
+        <div th:each="comment : ${story.comments}" th:if="${story.comments != null}" class="comment-box"
+            th:id="'comment-' + ${comment.id}"
+            style="background: #333; padding: 10px; margin-bottom: 10px; border-radius: 4px; position: relative;">
+            <button type="button" class="delete-btn" style="top: 5px; right: 5px; opacity: 1; font-size: 1.2em;"
+                th:hx-delete="@{/comments/{id}(id=${comment.id})}" hx-trigger="confirmed"
+                hx-target="closest .comment-box" hx-swap="outerHTML" onclick="event.preventDefault(); event.stopPropagation(); Swal.fire({
+                    title: 'Delete Comment?',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#3085d6',
+                    confirmButtonText: 'Yes, delete it!',
+                    heightAuto: false,
+                    target: document.getElementById('create-modal')
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        htmx.trigger(this, 'confirmed');
+                    }
+                })"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor"
+                    viewBox="0 0 16 16">
+                    <path
+                        d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z" />
+                    <path fill-rule="evenodd"
+                        d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z" />
+                </svg></button>
+            <div style="font-size: 0.9em; margin-bottom: 5px; color: #ccc;">
+                <span th:text="${comment.createdBy != null ? comment.createdBy.name : 'Unknown'}">User</span>
+                <span style="margin: 0 5px;">•</span>
+                <span th:text="${#temporals.format(comment.createdAt, 'MM/dd/yyyy HH:mm')}">Date</span>
+            </div>
+            <div th:text="${comment.text}" style="white-space: pre-wrap;">Comment text</div>
+        </div>
+        <div th:if="${story.comments == null || story.comments.isEmpty()}"
+            style="text-align: center; color: #777; padding: 10px;">
+            No comments yet.
+        </div>
+    </div>
+
+    <div th:fragment="commentForm(storyId)">
+        <form method="dialog">
+            <h3 style="margin-top: 0;">Add Comment</h3>
+            <button type="button" class="delete-btn" style="opacity: 1; top: 0; right: 0; font-size: 1.5em;"
+                onclick="document.getElementById('comment-modal').close()">×</button>
+            <div class="form-group">
+                <textarea name="text" rows="4" required placeholder="Enter your comment..."
+                    style="width: 100%;"></textarea>
+            </div>
+            <div class="btn-group">
+                <button type="button" class="secondary"
+                    onclick="document.getElementById('comment-modal').close()">Cancel</button>
+                <button type="submit" class="primary" th:hx-post="@{/stories/{id}/comments(id=${storyId})}"
+                    hx-target="#comment-list" hx-swap="innerHTML"
+                    hx-on::after-request="if(event.detail.successful) { document.getElementById('comment-modal').close(); }">Save</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Reusable Story Fields -->
+    <div th:fragment="storyFields(story, activeSprints)">
+        <div class="form-group">
+            <label for="title">Title</label>
+            <input type="text" id="title" name="title" required autocomplete="off" th:value="${story.title}">
+        </div>
+        <div class="form-group">
+            <label for="description">Description</label>
+            <textarea id="description" name="description" required th:text="${story.description}"></textarea>
+        </div>
+        <div class="form-group">
+            <label for="assignee">Assignee</label>
+            <input type="text" id="assignee" name="assignee" required autocomplete="off" th:value="${story.assignee}">
+        </div>
+        <div class="form-group">
+            <label for="points">Points (Optional)</label>
+            <input type="number" id="points" name="points" min="0" max="499" th:value="${story.points}">
+        </div>
+        <div class="form-group">
+            <label for="sprintId">Sprint (Optional)</label>
+            <select id="sprintId" name="sprintId">
+                <option value="">-- No Sprint --</option>
+                <option th:each="sprint : ${activeSprints}" th:value="${sprint.id}" th:text="${sprint.name}"
+                    th:selected="${story.sprint != null && story.sprint.id == sprint.id}"></option>
+            </select>
+        </div>
     </div>
 
     <!-- Sprint Fragments -->
@@ -201,7 +307,13 @@
                     if (result.isConfirmed) {
                         htmx.trigger(this, 'confirmed');
                     }
-                })">×</button>
+                })"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor"
+                viewBox="0 0 16 16">
+                <path
+                    d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z" />
+                <path fill-rule="evenodd"
+                    d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z" />
+            </svg></button>
     </div>
 
     <div th:fragment="sprintForm(sprint)">
@@ -224,9 +336,16 @@
                     if (result.isConfirmed) {
                         htmx.trigger(this, 'confirmed');
                     }
-                })">×</button>
+                })"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor"
+                    viewBox="0 0 16 16">
+                    <path
+                        d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z" />
+                    <path fill-rule="evenodd"
+                        d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z" />
+                </svg></button>
 
-            <h2 style="margin-top:0" th:text="${sprint.id == null ? 'Create Sprint' : 'Edit Sprint'}">Create Sprint</h2>
+            <h2 style="margin-top:0" th:text="${sprint.id == null ? 'Create Sprint' : 'Edit Sprint'}">Create Sprint
+            </h2>
 
             <div class="form-group">
                 <label for="name">Name</label>
@@ -290,7 +409,13 @@
                         htmx.trigger(this, 'confirmed');
                     }
                 })" title="Delete Project">
-                ×
+                <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor"
+                    viewBox="0 0 16 16">
+                    <path
+                        d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z" />
+                    <path fill-rule="evenodd"
+                        d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z" />
+                </svg>
             </button>
         </div>
     </div>
@@ -318,7 +443,13 @@
                     if (result.isConfirmed) {
                         htmx.trigger(this, 'confirmed');
                     }
-                })">×</button>
+                })"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor"
+                    viewBox="0 0 16 16">
+                    <path
+                        d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z" />
+                    <path fill-rule="evenodd"
+                        d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z" />
+                </svg></button>
 
             <h2 style="margin-top:0" th:text="${project.id == null ? 'Create Project' : 'Edit Project'}">Create Project
             </h2>
@@ -377,7 +508,13 @@
                 if (result.isConfirmed) {
                     htmx.trigger(this, 'confirmed');
                 }
-            })">×</button>
+            })"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor"
+                viewBox="0 0 16 16">
+                <path
+                    d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z" />
+                <path fill-rule="evenodd"
+                    d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z" />
+            </svg></button>
     </div>
 
     <div th:fragment="statusRowOob(status)" th:attr="hx-swap-oob='beforeend:#status-list-' + ${status.project.id}">
@@ -404,7 +541,13 @@
                     if (result.isConfirmed) {
                         htmx.trigger(this, 'confirmed');
                     }
-                })">×</button>
+                })"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor"
+                    viewBox="0 0 16 16">
+                    <path
+                        d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z" />
+                    <path fill-rule="evenodd"
+                        d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z" />
+                </svg></button>
 
             <h2 style="margin-top:0" th:text="${status.id == null ? 'Create Status' : 'Edit Status'}">Create Status</h2>
             <div class="form-group">

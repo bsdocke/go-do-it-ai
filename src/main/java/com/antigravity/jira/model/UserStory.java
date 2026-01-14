@@ -3,6 +3,8 @@ package com.antigravity.jira.model;
 import jakarta.persistence.*;
 import java.util.ArrayList;
 import java.util.List;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 
 @Entity
 public class UserStory {
@@ -12,6 +14,10 @@ public class UserStory {
 
     @Column(nullable = false)
     private String title;
+
+    @Min(value = 0, message = "Points must be non-negative")
+    @Max(value = 499, message = "Points must be less than 500")
+    private Integer points;
 
     @Column(length = 2000)
     private String description;
@@ -55,6 +61,14 @@ public class UserStory {
 
     public void setTitle(String title) {
         this.title = title;
+    }
+
+    public Integer getPoints() {
+        return points;
+    }
+
+    public void setPoints(Integer points) {
+        this.points = points;
     }
 
     public String getDescription() {

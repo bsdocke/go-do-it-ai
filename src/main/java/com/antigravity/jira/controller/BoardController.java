@@ -141,12 +141,14 @@ public class BoardController {
     public String createStory(@RequestParam String title,
             @RequestParam String description,
             @RequestParam String assignee,
+
+            @RequestParam(required = false) Integer points,
             @RequestParam(required = false) Long sprintId,
             @RequestParam(required = false, defaultValue = DEFAULT_VIEW) String view,
             Model model) {
         com.antigravity.jira.model.Project currentProject = (com.antigravity.jira.model.Project) model
                 .getAttribute(ATTR_CURRENT_PROJECT);
-        UserStory story = boardService.createStory(title, description, assignee, sprintId, currentProject);
+        UserStory story = boardService.createStory(title, description, assignee, points, sprintId, currentProject);
         model.addAttribute(ATTR_STORY, story);
 
         String oobTarget = null;
@@ -195,15 +197,33 @@ public class BoardController {
         return "fragments :: storyForm(story=${story}, activeSprints=${activeSprints}, view=${view}, projects=${projects})";
     }
 
+    @GetMapping("/story/{id}")
+    public String viewStory(@PathVariable Long id, Model model) {
+        UserStory story = boardService.getStory(id);
+        com.antigravity.jira.model.Project currentProject = story.getProject();
+
+        // Ensure the view renders with the correct project context even if session is
+        // different
+        model.addAttribute(ATTR_CURRENT_PROJECT, currentProject);
+
+        List<Sprint> activeSprints = boardService.getActiveSprintsForBoard(currentProject, java.time.LocalDate.now());
+
+        model.addAttribute(ATTR_STORY, story);
+        model.addAttribute("activeSprints", activeSprints);
+        return "story_view";
+    }
+
     @PutMapping("/stories/{id}")
     public String updateStory(@PathVariable Long id,
             @RequestParam String title,
             @RequestParam String description,
             @RequestParam String assignee,
+
+            @RequestParam(required = false) Integer points,
             @RequestParam(required = false) Long sprintId,
             @RequestParam(required = false, defaultValue = DEFAULT_VIEW) String view,
             Model model) {
-        UserStory story = boardService.updateStoryDetails(id, title, description, assignee, sprintId);
+        UserStory story = boardService.updateStoryDetails(id, title, description, assignee, points, sprintId);
         model.addAttribute(ATTR_STORY, story);
 
         // No OOB for update currently, just replace in place
@@ -220,6 +240,44 @@ public class BoardController {
     @ResponseBody
     public String deleteStory(@PathVariable Long id) {
         boardService.deleteStory(id);
+        return "";
+    }
+
+    @PostMapping("/stories/{id}/comments")
+    public String addComment(@PathVariable Long id, @RequestParam String text, Model model,
+            @AuthenticationPrincipal OAuth2User principal) {
+        AppUser user = boardService.getOrCreateUser(principal.getAttribute(EMAIL), principal.getAttribute("name"));
+        boardService.commentOnStory(id, text, user);
+        // Reload story to show updated comments
+        UserStory story = boardService.getStory(id);
+        model.addAttribute(ATTR_STORY, story);
+        // We only want to return the updated comment list or the whole form?
+        // Requirement: "Add button... When clicked, it should show a modal containing
+        // as its
+        // only input a text box... Below the text box should be the usual Save and
+        // Cancel
+        // buttons... Clicking outside the modal acts as a cancel action, but does not
+        // dismiss
+        // the User Story modal."
+        // Wait, the ADD button logic is likely separate.
+        // But here we are POSTing the comment.
+        // After adding, we probably want to update the comment list in the Story Modal.
+        // So we should return the comment list fragment (which we'll need to create or
+        // identify).
+        // Let's assume we return the 'comments' fragment of the story form.
+        return "fragments :: commentList(story=${story})";
+    }
+
+    @GetMapping("/stories/{id}/comments/form")
+    public String getCommentForm(@PathVariable Long id, Model model) {
+        model.addAttribute("storyId", id);
+        return "fragments :: commentForm(storyId=${storyId})";
+    }
+
+    @DeleteMapping("/comments/{id}")
+    @ResponseBody
+    public String deleteComment(@PathVariable Long id) {
+        boardService.deleteComment(id);
         return "";
     }
 
