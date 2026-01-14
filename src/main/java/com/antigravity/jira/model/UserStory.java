@@ -33,9 +33,6 @@ public class UserStory {
     @JoinColumn(name = "project_id")
     private Project project;
 
-    public UserStory() {
-    }
-
     public Project getProject() {
         return project;
     }

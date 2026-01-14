@@ -23,9 +23,6 @@ public class Sprint {
     @JoinColumn(name = "project_id")
     private Project project;
 
-    public Sprint() {
-    }
-
     public Project getProject() {
         return project;
     }

@@ -19,6 +19,7 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 @Controller
 public class BoardController {
 
+    private static final String EMAIL = "email";
     private static final String BACKLOG_VIEW = "backlog";
     private static final String DEFAULT_VIEW = "board";
 
@@ -38,6 +39,8 @@ public class BoardController {
     private static final String VIEW_SPRINTS = "sprints";
     private static final String VIEW_STATUSES = "statuses";
     private static final String VIEW_CURRENT = "current";
+
+    private static final String REDIRECT_PREFIX = "redirect:/";
 
     private final BoardService boardService;
 
@@ -89,7 +92,7 @@ public class BoardController {
     @GetMapping("/")
     public String landing(@AuthenticationPrincipal OAuth2User principal) {
         if (principal != null) {
-            return "redirect:/" + VIEW_CURRENT;
+            return REDIRECT_PREFIX + VIEW_CURRENT;
         }
         return "index";
     }
@@ -225,7 +228,7 @@ public class BoardController {
         // GlobalControllerAdvice adds currentUser, but we can also get it via principal
         // if needed
         // safer to use the service to ensure it's loaded bound to session logic if any
-        AppUser user = boardService.getOrCreateUser(principal.getAttribute("email"), principal.getAttribute("name"));
+        AppUser user = boardService.getOrCreateUser(principal.getAttribute(EMAIL), principal.getAttribute("name"));
         model.addAttribute(ATTR_PROJECTS, boardService.getProjectsForUser(user));
         return VIEW_PROJECTS;
     }
@@ -246,7 +249,7 @@ public class BoardController {
             Model model,
             @AuthenticationPrincipal OAuth2User principal) {
         try {
-            AppUser user = boardService.getOrCreateUser(principal.getAttribute("email"),
+            AppUser user = boardService.getOrCreateUser(principal.getAttribute(EMAIL),
                     principal.getAttribute("name"));
             com.antigravity.jira.model.Project project = boardService.createProject(name, description, user);
             model.addAttribute(ATTR_PROJECT, project);
@@ -425,9 +428,9 @@ public class BoardController {
     public String adminPage(Model model, @AuthenticationPrincipal OAuth2User principal) {
         // Simple security check (better via SecurityConfig but this works for now)
         // GlobalControllerAdvice injects 'currentUser'
-        AppUser user = boardService.getOrCreateUser(principal.getAttribute("email"), principal.getAttribute("name"));
+        AppUser user = boardService.getOrCreateUser(principal.getAttribute(EMAIL), principal.getAttribute("name"));
         if (!"ADMIN".equals(user.getRole())) {
-            return "redirect:/";
+            return REDIRECT_PREFIX;
         }
 
         // Admin sees all projects and their members
@@ -440,11 +443,10 @@ public class BoardController {
             Model model, @AuthenticationPrincipal OAuth2User principal) {
         try {
             boardService.addProjectMember(projectId, email);
-            return "redirect:/" + VIEW_ADMIN;
+            return REDIRECT_PREFIX + VIEW_ADMIN;
         } catch (IllegalArgumentException | IllegalStateException e) {
             // Reload admin page with error
-            AppUser user = boardService.getOrCreateUser(principal.getAttribute("email"),
-                    principal.getAttribute("name"));
+            boardService.getOrCreateUser(principal.getAttribute(EMAIL), principal.getAttribute("name"));
             model.addAttribute(ATTR_PROJECTS, boardService.getAllProjects());
             model.addAttribute("errorMessage", e.getMessage());
             return VIEW_ADMIN;

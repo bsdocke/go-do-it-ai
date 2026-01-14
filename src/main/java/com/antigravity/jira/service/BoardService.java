@@ -1,8 +1,11 @@
 package com.antigravity.jira.service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.time.LocalDate;
+import java.util.Comparator;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,9 +20,13 @@ import com.antigravity.jira.repository.ProjectRepository;
 import com.antigravity.jira.repository.SprintRepository;
 import com.antigravity.jira.repository.StatusRepository;
 import com.antigravity.jira.repository.UserStoryRepository;
+import com.antigravity.jira.exception.UserStoryException;
 
 @Service
 public class BoardService {
+
+    private static final String USER = "USER";
+    private static final String ADMIN = "ADMIN";
 
     private final StatusRepository statusRepository;
     private final UserStoryRepository userStoryRepository;
@@ -41,17 +48,15 @@ public class BoardService {
     public void init() {
         // Deduplicate Users if any exist (Fix for NonUniqueResultException)
         // Group by email, keep the one with lowest ID, delete others
-        java.util.List<AppUser> allUsers = appUserRepository.findAll();
-        java.util.Map<String, java.util.List<AppUser>> usersByEmail = allUsers.stream()
+        List<AppUser> allUsers = appUserRepository.findAll();
+        Map<String, List<AppUser>> usersByEmail = allUsers.stream()
                 .collect(Collectors.groupingBy(AppUser::getEmail));
 
-        for (java.util.Map.Entry<String, java.util.List<AppUser>> entry : usersByEmail.entrySet()) {
-            java.util.List<AppUser> duplicates = entry.getValue();
+        for (Map.Entry<String, List<AppUser>> entry : usersByEmail.entrySet()) {
+            List<AppUser> duplicates = entry.getValue();
             if (duplicates.size() > 1) {
                 // Sort by ID to keep the oldest
-                duplicates.sort(java.util.Comparator.comparing(AppUser::getId));
-                AppUser keep = duplicates.get(0);
-
+                duplicates.sort(Comparator.comparing(AppUser::getId));
                 for (int i = 1; i < duplicates.size(); i++) {
                     // Remove from projects first to avoid FK constraint issues?
                     // But duplicates might be in project_members too.
@@ -64,55 +69,13 @@ public class BoardService {
                     AppUser dupe = duplicates.get(i);
                     // We can't easily find projects for a user without a reverse lookup or scan.
                     // Since this is a patch, let's scan all projects.
-                    for (com.antigravity.jira.model.Project p : projectRepository.findAll()) {
+                    for (Project p : projectRepository.findAll()) {
                         if (p.getMembers().removeIf(m -> m.getId().equals(dupe.getId()))) {
                             // If removed, save project
                             projectRepository.save(p);
                         }
                     }
                     appUserRepository.delete(dupe);
-                }
-            }
-        }
-
-        if (projectRepository.count() == 0) {
-            // This init logic is for migrating old data or setting up a first project
-            // if no projects exist.
-            // With user-aware project creation, this might be less critical,
-            // but kept for initial setup or migration.
-            Project initialProject = new Project(
-                    "Initial Project",
-                    "Migration Project for existing data");
-            initialProject = projectRepository.save(initialProject);
-
-            List<Sprint> sprints = sprintRepository.findAll();
-            for (Sprint sprint : sprints) {
-                if (sprint.getProject() == null) {
-                    sprint.setProject(initialProject);
-                }
-            }
-            sprintRepository.saveAll(sprints);
-
-            List<UserStory> stories = userStoryRepository.findAll();
-            for (UserStory story : stories) {
-                if (story.getProject() == null) {
-                    story.setProject(initialProject);
-                }
-            }
-            userStoryRepository.saveAll(stories);
-
-            // Migrate global statuses to Initial Project (if any exist from old DB)
-            List<Status> globalStatuses = statusRepository.findByProjectIsNullOrderByPriorityAsc();
-            for (Status status : globalStatuses) {
-                status.setProject(initialProject);
-            }
-            statusRepository.saveAll(globalStatuses);
-
-            // If no statuses exist for init project (e.g. fresh DB), populate defaults
-            if (getStatusesForProject(initialProject).isEmpty()) {
-                String[] defaults = { "Analysis", "Ready", "In Progress", "Review", "Testing", "Staged", "Complete" };
-                for (String name : defaults) {
-                    createStatus(name, initialProject);
                 }
             }
         }
@@ -128,7 +91,7 @@ public class BoardService {
         List<AppUser> users = appUserRepository.findByEmail(email);
         if (users.isEmpty()) {
             boolean isFirstUser = appUserRepository.count() == 0;
-            String role = isFirstUser ? "ADMIN" : "USER";
+            String role = isFirstUser ? ADMIN : USER;
             return appUserRepository.save(new AppUser(email, name, role));
         }
         // Handle duplicates if they exist
@@ -136,86 +99,86 @@ public class BoardService {
             // Log warning?
             // Return the first one (oldest by ID usually if simpler)
             // Or sort by ID
-            users.sort(java.util.Comparator.comparing(AppUser::getId));
+            users.sort(Comparator.comparing(AppUser::getId));
             // We could delete others here too, but let's just be safe and return one.
             return users.get(0);
         }
         return users.get(0);
     }
 
-    public List<com.antigravity.jira.model.Project> getProjectsForUser(AppUser user) {
-        if ("ADMIN".equals(user.getRole())) {
+    public List<Project> getProjectsForUser(AppUser user) {
+        if (ADMIN.equals(user.getRole())) {
             return projectRepository.findAll(org.springframework.data.domain.Sort.by("name"));
         }
         return projectRepository.findAll(org.springframework.data.domain.Sort.by("name")).stream()
                 .filter(p -> p.getMembers().stream().anyMatch(m -> m.getId().equals(user.getId())))
-                .collect(Collectors.toList());
+                .toList();
     }
 
     // --- Project Management ---
 
-    public com.antigravity.jira.model.Project getDefaultProject() {
-        List<com.antigravity.jira.model.Project> projects = projectRepository.findAll();
+    public Project getDefaultProject() {
+        List<Project> projects = projectRepository.findAll();
         if (projects.isEmpty()) {
-            return projectRepository.save(new com.antigravity.jira.model.Project("Default Project", "Auto-created"));
+            return projectRepository.save(new Project("Default Project", "Auto-created"));
         }
         return projects.get(0);
     }
 
-    public List<com.antigravity.jira.model.Project> getAllProjects() {
+    public List<Project> getAllProjects() {
         return projectRepository.findAllByOrderByNameAsc();
     }
 
-    public com.antigravity.jira.model.Project getProject(Long id) {
+    public Project getProject(Long id) {
         return projectRepository.findById(id).orElse(null);
     }
 
-    public List<UserStory> getBacklogStories(com.antigravity.jira.model.Project project) {
+    public List<UserStory> getBacklogStories(Project project) {
         if (project == null)
             return java.util.Collections.emptyList();
         return userStoryRepository.findBySprintIsNullAndProjectOrderByIdAsc(project);
     }
 
-    public List<Sprint> getSprintsForProject(com.antigravity.jira.model.Project project) {
+    public List<Sprint> getSprintsForProject(Project project) {
         if (project == null)
             return java.util.Collections.emptyList();
         return sprintRepository.findAll().stream()
                 .filter(s -> s.getProject() != null && s.getProject().getId().equals(project.getId()))
-                .collect(Collectors.toList());
+                .toList();
     }
 
-    public List<Sprint> getActiveSprintsForBoard(com.antigravity.jira.model.Project project, java.time.LocalDate date) {
+    public List<Sprint> getActiveSprintsForBoard(Project project, java.time.LocalDate date) {
         if (project == null)
             return java.util.Collections.emptyList();
         List<Sprint> active = getActiveSprintsForBoard(date);
         return active.stream()
                 .filter(s -> s.getProject() != null && s.getProject().getId().equals(project.getId()))
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Transactional
-    public com.antigravity.jira.model.Project createProject(String name, String description) {
-        return projectRepository.save(new com.antigravity.jira.model.Project(name, description));
+    public Project createProject(String name, String description) {
+        return projectRepository.save(new Project(name, description));
     }
 
     private static final int MAX_PROJECTS_PER_USER = 5;
 
     @Transactional
-    public com.antigravity.jira.model.Project createProject(String name, String description, AppUser owner) {
-        if (!"ADMIN".equals(owner.getRole())) {
-            List<com.antigravity.jira.model.Project> userProjects = getProjectsForUser(owner);
+    public Project createProject(String name, String description, AppUser owner) {
+        if (!ADMIN.equals(owner.getRole())) {
+            List<Project> userProjects = getProjectsForUser(owner);
             if (userProjects.size() >= MAX_PROJECTS_PER_USER) {
                 throw new IllegalStateException("Project limit reached (Max " + MAX_PROJECTS_PER_USER + ")");
             }
         }
-        com.antigravity.jira.model.Project project = new com.antigravity.jira.model.Project(name, description);
+        Project project = new Project(name, description);
         project.getMembers().add(owner);
         return projectRepository.save(project);
     }
 
     @Transactional
-    public com.antigravity.jira.model.Project updateProject(Long id, String name, String description) {
-        com.antigravity.jira.model.Project project = getProject(id);
+    public Project updateProject(Long id, String name, String description) {
+        Project project = getProject(id);
         if (project != null) {
             project.setName(name);
             project.setDescription(description);
@@ -241,12 +204,12 @@ public class BoardService {
         // Pick the first one if duplicates exist
         AppUser user = users.get(0);
         if (users.size() > 1) {
-            users.sort(java.util.Comparator.comparing(AppUser::getId));
+            users.sort(Comparator.comparing(AppUser::getId));
             user = users.get(0);
         }
 
-        if (!"ADMIN".equals(user.getRole())) {
-            List<com.antigravity.jira.model.Project> userProjects = getProjectsForUser(user);
+        if (!ADMIN.equals(user.getRole())) {
+            List<Project> userProjects = getProjectsForUser(user);
             if (userProjects.size() >= MAX_PROJECTS_PER_USER) {
                 throw new IllegalStateException(
                         "User has reached the maximum project limit (" + MAX_PROJECTS_PER_USER + ")");
@@ -268,27 +231,18 @@ public class BoardService {
         return statusRepository.findAllByOrderByPriorityAsc();
     }
 
-    public List<Status> getStatusesForProject(com.antigravity.jira.model.Project project) {
-        // We'll need to add a repository method for this or filter
-        // Ideally: return statusRepository.findByProjectOrderByPriorityAsc(project);
-        // But for now, let's add the method to repository if not exists, or just filter
-        // Converting to stream filter for immediate compilation if repo method misses,
-        // but better to add repo method.
-        // Checking StatusRepository again... it doesn't have it yet.
-        // Let's rely on adding it to StatusRepo in a bit or use Example.
-        // For now, let's assume we added findAllByProjectOrderByPriorityAsc to Repo or
-        // use manual filter.
-        // Since I can't edit Repo in same atomic step easily without checking,
-        // I will implement a safe filter here or separate step.
-        // Actually, let's update Repository first or use this:
+    public List<Status> getStatusesForProject(Project project) {
+
+        // TODO actually filter in the repository, don't fetch every status then just
+        // filter in Java
         return statusRepository.findAll().stream()
                 .filter(s -> s.getProject() != null && project.getId().equals(s.getProject().getId()))
                 .sorted((s1, s2) -> s1.getPriority().compareTo(s2.getPriority()))
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Transactional
-    public Status createStatus(String name, com.antigravity.jira.model.Project project) {
+    public Status createStatus(String name, Project project) {
         Status existingName = statusRepository.findByNameAndProject(name, project);
         if (existingName != null) {
             throw new IllegalArgumentException("Status with name '" + name + "' already exists in this project.");
@@ -368,13 +322,13 @@ public class BoardService {
     public List<UserStory> getStoriesForSprint(Long sprintId) {
         return getAllStories().stream()
                 .filter(story -> story.getSprint() != null && story.getSprint().getId().equals(sprintId))
-                .collect(Collectors.toList());
+                .toList();
     }
 
     public List<UserStory> getBacklogStories() {
         return getAllStories().stream()
                 .filter(story -> story.getSprint() == null)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Transactional
@@ -387,7 +341,7 @@ public class BoardService {
         List<Status> projectStatuses = getStatusesForProject(project);
 
         if (projectStatuses.isEmpty()) {
-            throw new RuntimeException("No statuses defined for project: " + project.getName());
+            throw new UserStoryException("No statuses defined for project: " + project.getName());
         }
 
         Status defaultStatus = projectStatuses.get(0); // First one is lowest priority due to sorting in
@@ -427,12 +381,12 @@ public class BoardService {
         return null;
     }
 
-    public List<com.antigravity.jira.model.Sprint> getActiveSprints() {
+    public List<Sprint> getActiveSprints() {
         return sprintRepository.findByActiveTrue();
     }
 
-    public com.antigravity.jira.model.Sprint getCurrentSprint() {
-        List<com.antigravity.jira.model.Sprint> sprints = sprintRepository
+    public Sprint getCurrentSprint() {
+        List<Sprint> sprints = sprintRepository
                 .findActiveSprintForDate(java.time.LocalDate.now());
         return sprints.isEmpty() ? null : sprints.get(0);
     }
@@ -453,8 +407,8 @@ public class BoardService {
     }
 
     @Transactional
-    public Sprint createSprint(String name, String description, java.time.LocalDate startDate,
-            java.time.LocalDate endDate, com.antigravity.jira.model.Project project) {
+    public Sprint createSprint(String name, String description, LocalDate startDate,
+            LocalDate endDate, Project project) {
         Sprint sprint = new Sprint();
         sprint.setName(name);
         sprint.setDescription(description);
@@ -473,8 +427,8 @@ public class BoardService {
     }
 
     @Transactional
-    public Sprint updateSprint(Long id, String name, String description, java.time.LocalDate startDate,
-            java.time.LocalDate endDate) {
+    public Sprint updateSprint(Long id, String name, String description, LocalDate startDate,
+            LocalDate endDate) {
         Sprint sprint = getSprint(id);
         if (sprint != null) {
             sprint.setName(name);

@@ -1,8 +1,12 @@
 package com.antigravity.jira.controller;
 
+import com.antigravity.jira.model.AppUser;
 import com.antigravity.jira.model.Project;
 import com.antigravity.jira.service.BoardService;
 import jakarta.servlet.http.HttpSession;
+
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
 
@@ -18,8 +22,8 @@ public class GlobalControllerAdvice {
     }
 
     @ModelAttribute("currentUser")
-    public com.antigravity.jira.model.AppUser populateUser(
-            @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.oauth2.core.user.OAuth2User principal) {
+    public AppUser populateUser(
+            @AuthenticationPrincipal OAuth2User principal) {
         if (principal == null) {
             return null;
         }
@@ -29,7 +33,7 @@ public class GlobalControllerAdvice {
     }
 
     @ModelAttribute("allProjects")
-    public List<Project> populateProjects(@ModelAttribute("currentUser") com.antigravity.jira.model.AppUser user) {
+    public List<Project> populateProjects(@ModelAttribute("currentUser") AppUser user) {
         if (user == null) {
             return java.util.Collections.emptyList();
         }
