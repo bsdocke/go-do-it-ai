@@ -23,6 +23,12 @@ That said, it isn't rocket science to whip something like this up yourself, it's
 * Make it accessible - again, just good policy
 * Provide a non-dark mode - grumble grumble we'll see
 * Test automation - interested to see how well the AI does creating meaningful tests for code it wrote itself. Meaningful being the operative word
-* Sonar coverage and metric tracking - right now my criteria for determining how AntiGravity works vs. something like CoPilot or a junior developer is basically "it kind of looks better or worse", which is hardly a shining example of scientific rigor. I want to get some actual numbers
-* Support comments - basic functionality
+* ~~Sonar coverage and metric tracking - right now my criteria for determining how AntiGravity works vs. something like CoPilot or a junior developer is basically "it kind of looks better or worse", which is hardly a shining example of scientific rigor. I want to get some actual numbers~~ Ran it through sonarqube and had it fix most errors, or fixed them manually. There weren't many to begin with and they were mostly quite minor.
+* ~~Support comments - basic functionality~~ It had little trouble with this.
 * Support subtasks - basic functionality
+* ~~Allow for edit in a separate tab for stories~~ An afterthought but this is basic functionality. Will also be a home for more complex actions that are cramped on a modal, or less frequently used.
+* Support attachments - basic functionality
+* Support text formatting - basic functionality
+* Support closing of Sprints - currently there's a notion of a current sprint based on dates defined for the sprint, but it'd be nice to 'close' a sprint so stories roll over to the next sprint.
+* Add more roles, like project administrators or read-only users
+
