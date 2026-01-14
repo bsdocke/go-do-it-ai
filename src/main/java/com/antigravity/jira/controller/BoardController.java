@@ -20,6 +20,24 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 public class BoardController {
 
     private static final String BACKLOG_VIEW = "backlog";
+    private static final String DEFAULT_VIEW = "board";
+
+    private static final String ATTR_CURRENT_PROJECT = "currentProject";
+    private static final String ATTR_PROJECT = "project";
+    private static final String ATTR_PROJECTS = "projects";
+    private static final String ATTR_SPRINT = "sprint";
+    private static final String ATTR_SPRINTS = "sprints";
+    private static final String ATTR_STORY = "story";
+    private static final String ATTR_STORIES = "stories";
+    private static final String ATTR_STATUS = "status";
+    private static final String ATTR_STATUSES = "statuses";
+    private static final String ATTR_BOARD_DATA = "boardData";
+
+    private static final String VIEW_ADMIN = "admin";
+    private static final String VIEW_PROJECTS = "projects";
+    private static final String VIEW_SPRINTS = "sprints";
+    private static final String VIEW_STATUSES = "statuses";
+    private static final String VIEW_CURRENT = "current";
 
     private final BoardService boardService;
 
@@ -37,40 +55,41 @@ public class BoardController {
     @GetMapping("/current")
     public String currentBoard(Model model) {
         com.antigravity.jira.model.Project currentProject = (com.antigravity.jira.model.Project) model
-                .getAttribute("currentProject");
+                .getAttribute(ATTR_CURRENT_PROJECT);
         if (currentProject == null) {
-            model.addAttribute("boardData", new ArrayList<>());
-            return "current";
-        }
+            model.addAttribute(ATTR_BOARD_DATA, new ArrayList<>());
+        } else {
 
-        List<Sprint> activeSprints = boardService.getActiveSprintsForBoard(currentProject, java.time.LocalDate.now());
+            List<Sprint> activeSprints = boardService.getActiveSprintsForBoard(currentProject,
+                    java.time.LocalDate.now());
 
-        // We will enrich boardData to include statuses for that sprint's project.
-        List<Map<String, Object>> enrichedBoardData = new ArrayList<>();
-        if (!activeSprints.isEmpty()) {
-            for (Sprint sprint : activeSprints) {
-                List<UserStory> stories = boardService.getStoriesForSprint(sprint.getId());
-                Map<String, List<UserStory>> storiesByStatus = stories.stream()
-                        .collect(Collectors.groupingBy(s -> s.getStatus().getName()));
+            // We will enrich boardData to include statuses for that sprint's project.
+            List<Map<String, Object>> enrichedBoardData = new ArrayList<>();
+            if (!activeSprints.isEmpty()) {
+                for (Sprint sprint : activeSprints) {
+                    List<UserStory> stories = boardService.getStoriesForSprint(sprint.getId());
+                    Map<String, List<UserStory>> storiesByStatus = stories.stream()
+                            .collect(Collectors.groupingBy(s -> s.getStatus().getName()));
 
-                Map<String, Object> sprintData = new java.util.HashMap<>();
-                sprintData.put("sprint", sprint);
-                sprintData.put("storiesByStatus", storiesByStatus);
-                // Add project statuses here
-                sprintData.put("statuses", boardService.getStatusesForProject(sprint.getProject()));
+                    Map<String, Object> sprintData = new java.util.HashMap<>();
+                    sprintData.put(ATTR_SPRINT, sprint);
+                    sprintData.put("storiesByStatus", storiesByStatus);
+                    // Add project statuses here
+                    sprintData.put(ATTR_STATUSES, boardService.getStatusesForProject(sprint.getProject()));
 
-                enrichedBoardData.add(sprintData);
+                    enrichedBoardData.add(sprintData);
+                }
             }
-        }
 
-        model.addAttribute("boardData", enrichedBoardData);
-        return "current";
+            model.addAttribute(ATTR_BOARD_DATA, enrichedBoardData);
+        }
+        return VIEW_CURRENT;
     }
 
     @GetMapping("/")
     public String landing(@AuthenticationPrincipal OAuth2User principal) {
         if (principal != null) {
-            return "redirect:/current";
+            return "redirect:/" + VIEW_CURRENT;
         }
         return "index";
     }
@@ -78,18 +97,18 @@ public class BoardController {
     @GetMapping("/backlog")
     public String backlog(Model model) {
         com.antigravity.jira.model.Project currentProject = (com.antigravity.jira.model.Project) model
-                .getAttribute("currentProject");
+                .getAttribute(ATTR_CURRENT_PROJECT);
         List<UserStory> stories = boardService.getBacklogStories(currentProject);
-        model.addAttribute("stories", stories);
+        model.addAttribute(ATTR_STORIES, stories);
         return BACKLOG_VIEW;
     }
 
     @GetMapping("/sprints")
     public String sprints(Model model) {
         com.antigravity.jira.model.Project currentProject = (com.antigravity.jira.model.Project) model
-                .getAttribute("currentProject");
-        model.addAttribute("sprints", boardService.getSprintsForProject(currentProject));
-        return "sprints";
+                .getAttribute(ATTR_CURRENT_PROJECT);
+        model.addAttribute(ATTR_SPRINTS, boardService.getSprintsForProject(currentProject));
+        return VIEW_SPRINTS;
     }
 
     @GetMapping("/sprints/form")
@@ -98,7 +117,7 @@ public class BoardController {
         if (id != null) {
             sprint = boardService.getSprint(id);
         }
-        model.addAttribute("sprint", sprint);
+        model.addAttribute(ATTR_SPRINT, sprint);
         return "fragments :: sprintForm(sprint=${sprint})";
     }
 
@@ -120,12 +139,12 @@ public class BoardController {
             @RequestParam String description,
             @RequestParam String assignee,
             @RequestParam(required = false) Long sprintId,
-            @RequestParam(required = false, defaultValue = "board") String view,
+            @RequestParam(required = false, defaultValue = DEFAULT_VIEW) String view,
             Model model) {
         com.antigravity.jira.model.Project currentProject = (com.antigravity.jira.model.Project) model
-                .getAttribute("currentProject");
+                .getAttribute(ATTR_CURRENT_PROJECT);
         UserStory story = boardService.createStory(title, description, assignee, sprintId, currentProject);
-        model.addAttribute("story", story);
+        model.addAttribute(ATTR_STORY, story);
 
         String oobTarget = null;
         if (story.getSprint() != null) {
@@ -157,17 +176,17 @@ public class BoardController {
 
     @GetMapping("/stories/form")
     public String getStoryForm(@RequestParam(required = false) Long id,
-            @RequestParam(required = false, defaultValue = "board") String view,
+            @RequestParam(required = false, defaultValue = DEFAULT_VIEW) String view,
             Model model) {
         UserStory story = new UserStory();
         if (id != null) {
             story = boardService.getStory(id);
         }
         com.antigravity.jira.model.Project currentProject = (com.antigravity.jira.model.Project) model
-                .getAttribute("currentProject");
+                .getAttribute(ATTR_CURRENT_PROJECT);
         List<Sprint> activeSprints = boardService.getActiveSprintsForBoard(currentProject, java.time.LocalDate.now());
 
-        model.addAttribute("story", story);
+        model.addAttribute(ATTR_STORY, story);
         model.addAttribute("view", view);
         model.addAttribute("activeSprints", activeSprints);
         return "fragments :: storyForm(story=${story}, activeSprints=${activeSprints}, view=${view}, projects=${projects})";
@@ -179,10 +198,10 @@ public class BoardController {
             @RequestParam String description,
             @RequestParam String assignee,
             @RequestParam(required = false) Long sprintId,
-            @RequestParam(required = false, defaultValue = "board") String view,
+            @RequestParam(required = false, defaultValue = DEFAULT_VIEW) String view,
             Model model) {
         UserStory story = boardService.updateStoryDetails(id, title, description, assignee, sprintId);
-        model.addAttribute("story", story);
+        model.addAttribute(ATTR_STORY, story);
 
         // No OOB for update currently, just replace in place
         // But we must satisfy the fragment signature
@@ -207,8 +226,8 @@ public class BoardController {
         // if needed
         // safer to use the service to ensure it's loaded bound to session logic if any
         AppUser user = boardService.getOrCreateUser(principal.getAttribute("email"), principal.getAttribute("name"));
-        model.addAttribute("projects", boardService.getProjectsForUser(user));
-        return "projects";
+        model.addAttribute(ATTR_PROJECTS, boardService.getProjectsForUser(user));
+        return VIEW_PROJECTS;
     }
 
     @GetMapping("/projects/form")
@@ -217,7 +236,7 @@ public class BoardController {
         if (id != null) {
             project = boardService.getProject(id);
         }
-        model.addAttribute("project", project);
+        model.addAttribute(ATTR_PROJECT, project);
         return "fragments :: projectForm(project=${project})";
     }
 
@@ -230,7 +249,7 @@ public class BoardController {
             AppUser user = boardService.getOrCreateUser(principal.getAttribute("email"),
                     principal.getAttribute("name"));
             com.antigravity.jira.model.Project project = boardService.createProject(name, description, user);
-            model.addAttribute("project", project);
+            model.addAttribute(ATTR_PROJECT, project);
             return "fragments :: projectRow(project=${project})";
         } catch (IllegalStateException e) {
             return org.springframework.http.ResponseEntity.badRequest().body(e.getMessage());
@@ -243,7 +262,7 @@ public class BoardController {
             @RequestParam(required = false) String description,
             Model model) {
         com.antigravity.jira.model.Project project = boardService.updateProject(id, name, description);
-        model.addAttribute("project", project);
+        model.addAttribute(ATTR_PROJECT, project);
         return "fragments :: projectRow(project=${project})";
     }
 
@@ -277,10 +296,10 @@ public class BoardController {
                 end = java.time.LocalDate.now().plusWeeks(2);
             }
             com.antigravity.jira.model.Project currentProject = (com.antigravity.jira.model.Project) model
-                    .getAttribute("currentProject");
+                    .getAttribute(ATTR_CURRENT_PROJECT);
             boardService.createSprint(name, description, start, end, currentProject);
             // Return updated list
-            model.addAttribute("sprints", boardService.getSprintsForProject(currentProject));
+            model.addAttribute(ATTR_SPRINTS, boardService.getSprintsForProject(currentProject));
             // HTMX expects partials. We can return the list fragment.
             return "fragments :: sprintList(sprints=${sprints})";
         } catch (Exception e) {
@@ -302,7 +321,7 @@ public class BoardController {
             boardService.updateSprint(id, name, description, start, end);
 
             Sprint sprint = boardService.getSprint(id);
-            model.addAttribute("sprint", sprint);
+            model.addAttribute(ATTR_SPRINT, sprint);
             return "fragments :: sprintRow(sprint=${sprint})";
         } catch (Exception e) {
             return "";
@@ -321,18 +340,18 @@ public class BoardController {
     @GetMapping("/statuses")
     public String statuses(Model model) {
         com.antigravity.jira.model.Project currentProject = (com.antigravity.jira.model.Project) model
-                .getAttribute("currentProject");
+                .getAttribute(ATTR_CURRENT_PROJECT);
 
         Map<Long, List<Status>> projectStatuses = new java.util.HashMap<>();
         if (currentProject != null) {
             projectStatuses.put(currentProject.getId(), boardService.getStatusesForProject(currentProject));
-            model.addAttribute("projects", List.of(currentProject));
+            model.addAttribute(ATTR_PROJECTS, List.of(currentProject));
         } else {
-            model.addAttribute("projects", new ArrayList<>());
+            model.addAttribute(ATTR_PROJECTS, new ArrayList<>());
         }
         model.addAttribute("projectStatuses", projectStatuses);
 
-        return "statuses";
+        return VIEW_STATUSES;
     }
 
     @GetMapping("/statuses/form")
@@ -342,8 +361,8 @@ public class BoardController {
             status = boardService.getStatus(id);
         }
 
-        model.addAttribute("status", status);
-        model.addAttribute("projects", boardService.getAllProjects());
+        model.addAttribute(ATTR_STATUS, status);
+        model.addAttribute(ATTR_PROJECTS, boardService.getAllProjects());
         return "fragments :: statusForm(status=${status}, projects=${projects})";
     }
 
@@ -351,9 +370,9 @@ public class BoardController {
     public Object createStatus(@RequestParam("statusName") String name, Model model) {
         try {
             com.antigravity.jira.model.Project currentProject = (com.antigravity.jira.model.Project) model
-                    .getAttribute("currentProject");
+                    .getAttribute(ATTR_CURRENT_PROJECT);
             Status status = boardService.createStatus(name, currentProject);
-            model.addAttribute("status", status);
+            model.addAttribute(ATTR_STATUS, status);
             return "fragments :: statusRowOob(status=${status})";
         } catch (IllegalArgumentException e) {
             return org.springframework.http.ResponseEntity.badRequest().body(e.getMessage());
@@ -375,7 +394,7 @@ public class BoardController {
     public Object updateStatus(@PathVariable Long id, @RequestParam("statusName") String name, Model model) {
         try {
             Status status = boardService.updateStatus(id, name);
-            model.addAttribute("status", status);
+            model.addAttribute(ATTR_STATUS, status);
             return "fragments :: statusRow(status=${status})";
         } catch (IllegalArgumentException e) {
             return org.springframework.http.ResponseEntity.badRequest().body(e.getMessage());
@@ -412,8 +431,8 @@ public class BoardController {
         }
 
         // Admin sees all projects and their members
-        model.addAttribute("projects", boardService.getAllProjects());
-        return "admin";
+        model.addAttribute(ATTR_PROJECTS, boardService.getAllProjects());
+        return VIEW_ADMIN;
     }
 
     @PostMapping("/admin/projects/{projectId}/members")
@@ -421,14 +440,14 @@ public class BoardController {
             Model model, @AuthenticationPrincipal OAuth2User principal) {
         try {
             boardService.addProjectMember(projectId, email);
-            return "redirect:/admin";
+            return "redirect:/" + VIEW_ADMIN;
         } catch (IllegalArgumentException | IllegalStateException e) {
             // Reload admin page with error
             AppUser user = boardService.getOrCreateUser(principal.getAttribute("email"),
                     principal.getAttribute("name"));
-            model.addAttribute("projects", boardService.getAllProjects());
+            model.addAttribute(ATTR_PROJECTS, boardService.getAllProjects());
             model.addAttribute("errorMessage", e.getMessage());
-            return "admin";
+            return VIEW_ADMIN;
         }
     }
 
