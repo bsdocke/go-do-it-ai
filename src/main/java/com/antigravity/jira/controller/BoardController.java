@@ -19,6 +19,8 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 @Controller
 public class BoardController {
 
+    private static final String BACKLOG_VIEW = "backlog";
+
     private final BoardService boardService;
 
     public BoardController(BoardService boardService) {
@@ -79,7 +81,7 @@ public class BoardController {
                 .getAttribute("currentProject");
         List<UserStory> stories = boardService.getBacklogStories(currentProject);
         model.addAttribute("stories", stories);
-        return "backlog";
+        return BACKLOG_VIEW;
     }
 
     @GetMapping("/sprints")
@@ -128,13 +130,13 @@ public class BoardController {
         String oobTarget = null;
         if (story.getSprint() != null) {
             oobTarget = "beforeend:#story-list-" + story.getSprint().getId() + "-" + story.getStatus().getId();
-        } else if ("backlog".equals(view)) {
+        } else if (BACKLOG_VIEW.equals(view)) {
             oobTarget = "beforeend:#backlog-list";
         }
 
         model.addAttribute("oobTarget", oobTarget);
 
-        if ("backlog".equals(view)) {
+        if (BACKLOG_VIEW.equals(view)) {
             // If we are in backlog view
             if (story.getSprint() == null) {
                 // New backlog item - render it
@@ -186,7 +188,7 @@ public class BoardController {
         // But we must satisfy the fragment signature
         model.addAttribute("oobTarget", null);
 
-        if ("backlog".equals(view)) {
+        if (BACKLOG_VIEW.equals(view)) {
             return "fragments :: backlogItem(story=${story}, oobTarget=${oobTarget})";
         }
         return "fragments :: card(story=${story}, oobTarget=${oobTarget})";
