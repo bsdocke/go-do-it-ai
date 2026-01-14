@@ -1,5 +1,12 @@
 package com.antigravity.jira.service;
 
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.antigravity.jira.model.AppUser;
 import com.antigravity.jira.model.Project;
 import com.antigravity.jira.model.Sprint;
@@ -10,13 +17,6 @@ import com.antigravity.jira.repository.ProjectRepository;
 import com.antigravity.jira.repository.SprintRepository;
 import com.antigravity.jira.repository.StatusRepository;
 import com.antigravity.jira.repository.UserStoryRepository;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import jakarta.annotation.PostConstruct;
-import java.util.List;
-import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Service
 public class BoardService {
