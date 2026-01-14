@@ -14,7 +14,8 @@
          For now, we use the standard header. -->
     <div th:replace="~{fragments :: header(title=${story.title}, activePage='board', addButtonUrl=null)}"></div>
 
-    <div class="main-content" style="max-width: 800px; margin: 0 auto; padding-top: 20px;">
+    <div class="main-content"
+        style="max-width: 1200px; margin: 0 auto; padding-top: 20px; display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
         <style>
             .header h1 {
                 display: -webkit-box;
@@ -26,31 +27,53 @@
             }
         </style>
 
-        <form style="background: #2d2d2d; padding: 20px; border-radius: 8px;">
-            <!-- Fields -->
-            <div th:replace="~{fragments :: storyFields(story=${story}, activeSprints=${activeSprints})}"></div>
+        <!-- Left Column: Story Details -->
+        <div style="min-width: 0;">
+            <form style="background: #2d2d2d; padding: 20px; border-radius: 8px;">
+                <!-- Fields -->
+                <div th:replace="~{fragments :: storyFields(story=${story}, activeSprints=${activeSprints})}"></div>
 
-            <!-- Save Button -->
-            <div class="btn-group" style="margin-top: 20px;">
-                <button type="submit" class="primary" th:hx-put="@{/stories/{id}(id=${story.id})}" hx-swap="none"
-                    hx-on::after-request="if(event.detail.successful) { Swal.fire({ icon: 'success', title: 'Saved', toast: true, position: 'bottom-end', showConfirmButton: false, timer: 3000 }); } else { Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to save', toast: true, position: 'bottom-end', showConfirmButton: false, timer: 3000 }); }">Save</button>
-            </div>
+                <!-- Save Button -->
+                <div class="btn-group" style="margin-top: 20px;">
+                    <button type="submit" class="primary" th:hx-put="@{/stories/{id}(id=${story.id})}" hx-swap="none"
+                        hx-on::after-request="if(event.detail.successful) { Swal.fire({ icon: 'success', title: 'Saved', toast: true, position: 'bottom-end', showConfirmButton: false, timer: 3000 }); } else { Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to save', toast: true, position: 'bottom-end', showConfirmButton: false, timer: 3000 }); }">Save</button>
+                </div>
 
-            <!-- Comments Section -->
-            <div style="margin-top: 30px; border-top: 1px solid #444; padding-top: 20px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <h3 style="margin: 0;">Comments</h3>
+                <!-- Comments Section -->
+                <div style="margin-top: 30px; border-top: 1px solid #444; padding-top: 20px;">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <h3 style="margin: 0;">Comments</h3>
+                        <button type="button" class="add-btn" style="font-size: 1.2em; padding: 0 10px;"
+                            th:hx-get="@{/stories/{id}/comments/form(id=${story.id})}"
+                            hx-target="#comment-modal-content"
+                            hx-on::after-request="document.getElementById('comment-modal').showModal()">+</button>
+                    </div>
+
+                    <div id="comment-list"
+                        style="max-height: 400px; overflow-y: auto; border: 1px solid #444; border-radius: 4px; padding: 10px; background: #222;">
+                        <div th:replace="~{fragments :: commentList(story=${story})}"></div>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Right Column: Sub-tasks -->
+        <div style="min-width: 0;">
+            <div
+                style="background: #2d2d2d; padding: 20px; border-radius: 8px; position: sticky; top: 20px; max-height: calc(100vh - 100px); display: flex; flex-direction: column;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="margin: 0;">Sub-tasks</h3>
                     <button type="button" class="add-btn" style="font-size: 1.2em; padding: 0 10px;"
-                        th:hx-get="@{/stories/{id}/comments/form(id=${story.id})}" hx-target="#comment-modal-content"
+                        th:hx-get="@{/stories/{id}/subtasks/form(id=${story.id})}" hx-target="#comment-modal-content"
                         hx-on::after-request="document.getElementById('comment-modal').showModal()">+</button>
                 </div>
 
-                <div id="comment-list"
-                    style="max-height: 400px; overflow-y: auto; border: 1px solid #444; border-radius: 4px; padding: 10px; background: #222;">
-                    <div th:replace="~{fragments :: commentList(story=${story})}"></div>
+                <div style="overflow-y: auto; flex-grow: 1;">
+                    <div th:replace="~{fragments :: subTaskList(story=${story})}"></div>
                 </div>
             </div>
-        </form>
+        </div>
     </div>
 
     <!-- Comment Modal for Adding Comments -->
@@ -67,7 +90,9 @@
          If 'create-modal' doesn't exist, Swal might fail or default to body.
          Better to include it or change target. Since we reuse the fragment, we should have the modal present.
     -->
-    <dialog id="create-modal" style="display: none;"></dialog>
+    <dialog id="create-modal">
+        <div id="modal-content"></div>
+    </dialog>
 
 </body>
 

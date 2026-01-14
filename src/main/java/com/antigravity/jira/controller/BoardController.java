@@ -233,6 +233,9 @@ public class BoardController {
         if (BACKLOG_VIEW.equals(view)) {
             return "fragments :: backlogItem(story=${story}, oobTarget=${oobTarget})";
         }
+        if (story.getParentStory() != null) {
+            return "fragments :: subTaskTile(subtask=${story})";
+        }
         return "fragments :: card(story=${story}, oobTarget=${oobTarget})";
     }
 
@@ -279,6 +282,24 @@ public class BoardController {
     public String deleteComment(@PathVariable Long id) {
         boardService.deleteComment(id);
         return "";
+    }
+
+    @GetMapping("/stories/{id}/subtasks/form")
+    public String getSubTaskForm(@PathVariable Long id, Model model) {
+        model.addAttribute("parentStoryId", id);
+        return "fragments :: subTaskForm(parentStoryId=${parentStoryId})";
+    }
+
+    @PostMapping("/stories/{id}/subtasks")
+    public String createSubTask(@PathVariable Long id, @RequestParam String title, @RequestParam String description,
+            Model model, @AuthenticationPrincipal OAuth2User principal) {
+        AppUser user = boardService.getOrCreateUser(principal.getAttribute(EMAIL), principal.getAttribute("name"));
+        boardService.createSubTask(id, title, description, user);
+
+        // Return updated subtask list
+        UserStory parent = boardService.getStory(id);
+        model.addAttribute(ATTR_STORY, parent);
+        return "fragments :: subTaskList(story=${story})";
     }
 
     @GetMapping("/projects")

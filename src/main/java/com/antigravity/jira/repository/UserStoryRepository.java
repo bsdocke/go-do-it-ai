@@ -6,9 +6,12 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface UserStoryRepository extends JpaRepository<UserStory, Long> {
-    List<UserStory> findByStatusOrderByIdDesc(Status status);
+    List<UserStory> findByStatusAndParentStoryIsNullOrderByIdDesc(Status status);
 
-    List<UserStory> findBySprintIsNullOrderByIdAsc();
+    List<UserStory> findBySprintIsNullAndParentStoryIsNullOrderByIdAsc();
 
-    List<UserStory> findBySprintIsNullAndProjectOrderByIdAsc(com.antigravity.jira.model.Project project);
+    List<UserStory> findBySprintIsNullAndProjectOrderByIdAsc(
+            com.antigravity.jira.model.Project project);
+
+    List<UserStory> findByStatusAndParentStoryIsNull(Status status);
 }

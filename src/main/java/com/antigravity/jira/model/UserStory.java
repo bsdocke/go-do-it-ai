@@ -36,6 +36,13 @@ public class UserStory {
     private List<Comment> comments = new ArrayList<>();
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_story_id")
+    private UserStory parentStory;
+
+    @OneToMany(mappedBy = "parentStory", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<UserStory> subTasks = new ArrayList<>();
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "project_id")
     private Project project;
 
@@ -119,5 +126,31 @@ public class UserStory {
     public void removeComment(Comment comment) {
         comments.remove(comment);
         comment.setUserStory(null);
+    }
+
+    public UserStory getParentStory() {
+        return parentStory;
+    }
+
+    public void setParentStory(UserStory parentStory) {
+        this.parentStory = parentStory;
+    }
+
+    public List<UserStory> getSubTasks() {
+        return subTasks;
+    }
+
+    public void setSubTasks(List<UserStory> subTasks) {
+        this.subTasks = subTasks;
+    }
+
+    public void addSubTask(UserStory subTask) {
+        subTasks.add(subTask);
+        subTask.setParentStory(this);
+    }
+
+    public void removeSubTask(UserStory subTask) {
+        subTasks.remove(subTask);
+        subTask.setParentStory(null);
     }
 }

@@ -286,7 +286,7 @@ public class BoardService {
     public void deleteStatus(Long id) {
         Status status = statusRepository.findById(id).orElse(null);
         if (status != null) {
-            List<UserStory> stories = userStoryRepository.findByStatusOrderByIdDesc(status);
+            List<UserStory> stories = userStoryRepository.findByStatusAndParentStoryIsNullOrderByIdDesc(status);
             if (!stories.isEmpty()) {
                 throw new IllegalStateException(
                         "Cannot delete status containing stories. Please move or delete the stories first.");
@@ -308,7 +308,7 @@ public class BoardService {
     }
 
     public List<UserStory> getStoriesByStatus(Status status) {
-        return userStoryRepository.findByStatusOrderByIdDesc(status);
+        return userStoryRepository.findByStatusAndParentStoryIsNullOrderByIdDesc(status);
     }
 
     @Transactional
@@ -364,6 +364,39 @@ public class BoardService {
         }
 
         return userStoryRepository.save(story);
+    }
+
+    @Transactional
+    public UserStory createSubTask(Long parentStoryId, String title, String description, AppUser user) {
+        Optional<UserStory> parentOpt = userStoryRepository.findById(parentStoryId);
+        if (parentOpt.isPresent()) {
+            UserStory parent = parentOpt.get();
+
+            // Subtask inherits project
+            Project project = parent.getProject();
+
+            // Find default status (or same as parent? Requirements say "any status
+            // available". Default to first.)
+            List<Status> projectStatuses = getStatusesForProject(project);
+            if (projectStatuses.isEmpty()) {
+                throw new UserStoryException("No statuses defined for project: " + project.getName());
+            }
+            Status defaultStatus = projectStatuses.get(0);
+
+            UserStory subTask = new UserStory();
+            subTask.setTitle(title);
+            subTask.setDescription(description);
+            subTask.setAssignee(user.getName()); // Assign to creator initially? Or unassigned. Req says "input field
+                                                 // for Title and Description". Assignee not mentioned.
+            // Let's leave assignee null or "Unassigned" if not provided.
+            subTask.setStatus(defaultStatus);
+            subTask.setProject(project);
+            subTask.setSprint(parent.getSprint());
+
+            parent.addSubTask(subTask);
+            return userStoryRepository.save(subTask);
+        }
+        throw new IllegalArgumentException("Parent story not found id: " + parentStoryId);
     }
 
     @Transactional

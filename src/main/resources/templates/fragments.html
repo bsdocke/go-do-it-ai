@@ -64,6 +64,11 @@
         <div style="display: flex; align-items: start; gap: 5px; margin-right: 25px;">
             <div style="background: #555; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; font-weight: bold; flex-shrink: 0;"
                 th:if="${story.points != null}" th:text="${story.points}"></div>
+            <div th:if="${story.parentStory != null}"
+                style="background: #444; border: 1px solid #777; color: #ccc; padding: 0 4px; border-radius: 3px; font-size: 0.75em; flex-shrink: 0;"
+                title="Sub-task">
+                &#8627;
+            </div>
             <span class="card-title" th:text="${story.title}" style="display: block;">Story Title</span>
         </div>
         <button type="button" class="delete-btn" th:hx-delete="@{/stories/{id}(id=${story.id})}" hx-trigger="confirmed"
@@ -97,6 +102,10 @@
         hx-on::after-request="document.getElementById('create-modal').showModal()" th:hx-swap-oob="${oobTarget}">
 
         <div class="backlog-item-details">
+            <div th:if="${story.parentStory != null}" style="display:inline-block; margin-right: 5px; color: #888;"
+                title="Sub-task">
+                &#8627;
+            </div>
             <span class="backlog-title" th:text="${story.title}">Story Title</span>
             <span class="backlog-desc" th:text="${#strings.abbreviate(story.description, 100)}">Description...</span>
         </div>
@@ -126,7 +135,7 @@
             <button type="button" class="delete-btn" style="opacity: 1; top: 0; right: 0; font-size: 1.5em;"
                 th:if="${story.id != null}" th:hx-delete="@{/stories/{id}(id=${story.id})}" hx-trigger="confirmed"
                 hx-target="this" hx-swap="none"
-                th:hx-on::after-request="|if(event.detail.successful) { document.getElementById('create-modal').close(); var c = document.getElementById('card-${story.id}'); if(c) c.remove(); }|"
+                th:hx-on::after-request="|if(event.detail.successful) { document.getElementById('create-modal').close(); var c = document.getElementById('card-${story.id}'); if(c) c.remove(); var s = document.getElementById('subtask-${story.id}'); if(s) s.remove(); }|"
                 onclick="event.preventDefault(); Swal.fire({
                     title: 'Are you sure?',
                     text: 'You won\'t be able to revert this!',
@@ -164,7 +173,7 @@
                     onclick="document.getElementById('create-modal').close()">Cancel</button>
                 <button type="submit" class="primary" th:hx-post="${story.id == null ? '/stories' : ''}"
                     th:hx-put="${story.id != null ? '/stories/' + story.id : ''}"
-                    th:hx-target="${story.id == null ? 'this' : '#card-' + story.id}"
+                    th:hx-target="${story.id == null ? 'this' : (view == 'subtask' ? '#subtask-' + story.id : '#card-' + story.id)}"
                     th:hx-swap="${story.id == null ? 'none' : 'outerHTML'}"
                     hx-on::after-request="if(event.detail.successful) { document.getElementById('create-modal').close(); }">Save</button>
             </div>
@@ -568,6 +577,74 @@
                     hx-on::after-request="if(event.detail.successful) { document.getElementById('create-modal').close(); } else { Swal.fire({ icon: 'error', title: 'Error', text: event.detail.xhr.responseText, confirmButtonColor: '#3085d6', target: document.getElementById('create-modal') }); }">Save</button>
             </div>
         </form>
+    </div>
+
+    <div th:fragment="subTaskForm(parentStoryId)">
+        <form method="dialog">
+            <h3 style="margin-top: 0;">Add Sub-task</h3>
+            <button type="button" class="delete-btn" style="opacity: 1; top: 0; right: 0; font-size: 1.5em;"
+                onclick="document.getElementById('comment-modal').close()">×</button>
+            <div class="form-group">
+                <label for="subtask-title">Title</label>
+                <input type="text" id="subtask-title" name="title" required autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label for="subtask-desc">Description</label>
+                <textarea id="subtask-desc" name="description" required rows="3"></textarea>
+            </div>
+
+            <div class="btn-group">
+                <button type="button" class="secondary"
+                    onclick="document.getElementById('comment-modal').close()">Cancel</button>
+                <button type="submit" class="primary" th:hx-post="@{/stories/{id}/subtasks(id=${parentStoryId})}"
+                    hx-target="#subtask-list"
+                    hx-on::after-request="if(event.detail.successful) { document.getElementById('comment-modal').close(); }">Save</button>
+            </div>
+        </form>
+    </div>
+
+    <div th:fragment="subTaskList(story)" id="subtask-list">
+        <div th:if="${story.subTasks != null && !story.subTasks.isEmpty()}"
+            style="display: grid; grid-template-columns: 1fr; gap: 10px;">
+            <div th:each="subtask : ${story.subTasks}">
+                <div th:replace="~{fragments :: subTaskTile(subtask=${subtask})}"></div>
+            </div>
+        </div>
+        <div th:if="${story.subTasks == null || story.subTasks.isEmpty()}"
+            style="color: #777; text-align: center; padding: 10px;">
+            No sub-tasks.
+        </div>
+    </div>
+
+    <div th:fragment="subTaskTile(subtask)" class="card" th:id="'subtask-' + ${subtask.id}" th:data-id="${subtask.id}"
+        hx-trigger="click" th:hx-get="@{/stories/form(id=${subtask.id}, view='subtask')}" hx-target="#modal-content"
+        hx-on::after-request="document.getElementById('create-modal').showModal()"
+        style="cursor: pointer; position: relative;">
+
+        <div style="font-weight: bold; margin-bottom: 5px;" th:text="${subtask.title}">Subtask Title</div>
+        <div style="font-size: 0.9em; color: #ccc;" th:text="${#strings.abbreviate(subtask.description, 60)}">
+            Desc</div>
+
+        <button type="button" class="delete-btn" th:hx-delete="@{/stories/{id}(id=${subtask.id})}"
+            hx-trigger="confirmed" hx-target="closest .card" hx-swap="outerHTML" onclick="event.preventDefault(); event.stopPropagation(); Swal.fire({
+                title: 'Delete Sub-task?',
+                text: 'Irreversible.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'Yes, delete!',
+                heightAuto: false
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    htmx.trigger(this, 'confirmed');
+                }
+            })"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor"
+                viewBox="0 0 16 16">
+                <path
+                    d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z" />
+                <path fill-rule="evenodd"
+                    d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z" />
+            </svg></button>
     </div>
 
     <!-- Empty fragment for deletion -->
