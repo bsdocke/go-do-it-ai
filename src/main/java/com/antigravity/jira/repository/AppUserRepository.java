@@ -4,7 +4,7 @@ import com.antigravity.jira.model.AppUser;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface AppUserRepository extends JpaRepository<AppUser, Long> {
-    java.util.List<com.antigravity.jira.model.AppUser> findByEmail(String email);
+    java.util.List<AppUser> findByEmail(String email);
 
     boolean existsByRole(String role);
 }

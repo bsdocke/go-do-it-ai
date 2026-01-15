@@ -1,28 +1,26 @@
 package com.antigravity.jira.service;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Collectors;
 import java.time.LocalDate;
 import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.antigravity.jira.exception.UserStoryException;
 import com.antigravity.jira.model.AppUser;
+import com.antigravity.jira.model.Comment;
 import com.antigravity.jira.model.Project;
 import com.antigravity.jira.model.Sprint;
 import com.antigravity.jira.model.Status;
 import com.antigravity.jira.model.UserStory;
 import com.antigravity.jira.repository.AppUserRepository;
+import com.antigravity.jira.repository.CommentRepository;
 import com.antigravity.jira.repository.ProjectRepository;
 import com.antigravity.jira.repository.SprintRepository;
 import com.antigravity.jira.repository.StatusRepository;
 import com.antigravity.jira.repository.UserStoryRepository;
-import com.antigravity.jira.repository.CommentRepository;
-import com.antigravity.jira.exception.UserStoryException;
-import com.antigravity.jira.model.Comment;
 
 @Service
 public class BoardService {
@@ -46,43 +44,6 @@ public class BoardService {
         this.projectRepository = projectRepository;
         this.appUserRepository = appUserRepository;
         this.commentRepository = commentRepository;
-    }
-
-    @jakarta.annotation.PostConstruct
-    public void init() {
-        // Deduplicate Users if any exist (Fix for NonUniqueResultException)
-        // Group by email, keep the one with lowest ID, delete others
-        List<AppUser> allUsers = appUserRepository.findAll();
-        Map<String, List<AppUser>> usersByEmail = allUsers.stream()
-                .collect(Collectors.groupingBy(AppUser::getEmail));
-
-        for (Map.Entry<String, List<AppUser>> entry : usersByEmail.entrySet()) {
-            List<AppUser> duplicates = entry.getValue();
-            if (duplicates.size() > 1) {
-                // Sort by ID to keep the oldest
-                duplicates.sort(Comparator.comparing(AppUser::getId));
-                for (int i = 1; i < duplicates.size(); i++) {
-                    // Remove from projects first to avoid FK constraint issues?
-                    // But duplicates might be in project_members too.
-                    // Let's just delete the user, cascade should handle it?
-                    // Actually Project.members is ManyToMany, mapped by join table.
-                    // We should probably rely on manual cleanup if CascadeType.ALL is on Project
-                    // side?
-                    // Let's just try deleting the user.
-                    // Wait, we need to remove them from any projects they are in to be safe.
-                    AppUser dupe = duplicates.get(i);
-                    // We can't easily find projects for a user without a reverse lookup or scan.
-                    // Since this is a patch, let's scan all projects.
-                    for (Project p : projectRepository.findAll()) {
-                        if (p.getMembers().removeIf(m -> m.getId().equals(dupe.getId()))) {
-                            // If removed, save project
-                            projectRepository.save(p);
-                        }
-                    }
-                    appUserRepository.delete(dupe);
-                }
-            }
-        }
     }
 
     public List<UserStory> getAllStories() {
@@ -236,13 +197,7 @@ public class BoardService {
     }
 
     public List<Status> getStatusesForProject(Project project) {
-
-        // TODO actually filter in the repository, don't fetch every status then just
-        // filter in Java
-        return statusRepository.findAll().stream()
-                .filter(s -> s.getProject() != null && project.getId().equals(s.getProject().getId()))
-                .sorted((s1, s2) -> s1.getPriority().compareTo(s2.getPriority()))
-                .toList();
+        return statusRepository.findByProjectOrderByPriorityAsc(project);
     }
 
     @Transactional
